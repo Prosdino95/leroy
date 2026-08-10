@@ -10,6 +10,16 @@ gratuito: il costo di esercizio è zero.
 
 ---
 
+## Sviluppo
+
+Leroy è stato progettato e scritto in coppia con un assistente AI, in sessioni
+di lavoro iterative: architettura, workflow, API e interfaccia sono nati da un
+dialogo e non da generazione automatica di codice non letto. Ogni componente è
+stato eseguito e verificato prima di essere considerato concluso, e diversi
+errori di progettazione sono emersi proprio costruendolo.
+
+---
+
 ## Cosa fa
 
 Una spesa entra nel sistema senza che tu faccia nulla. La notifica della
@@ -214,6 +224,31 @@ prima di averne bisogno.
 
 ---
 
+### Revisione di sicurezza
+
+Il codice dell'app è stato sottoposto a una revisione mirata sulle classi di
+vulnerabilità rilevanti per un'applicazione di questo tipo:
+
+- iniezione nel DOM da dati non fidati — i contenuti arrivano da email,
+  notifiche e risposte di un modello linguistico, quindi vanno trattati come
+  ostili
+- gestione del token: dove è memorizzato, verso dove viaggia, dove non deve
+  comparire
+- politica di caching del service worker, perché non conservi dati personali
+  su disco
+- validazione di importi e date prima della scrittura
+- assenza di dipendenze esterne e di risorse caricate da terze parti
+
+Le correzioni emerse sono state applicate: obbligo di HTTPS e di stessa origine
+per l'endpoint, Content Security Policy restrittiva, eliminazione di ogni
+percorso in grado di scrivere HTML non controllato nel DOM.
+
+*Non è un audit professionale.* È un progetto personale, per un utente
+singolo, distribuito senza garanzie. Chi volesse riusarlo in un contesto
+diverso dovrebbe rivederlo con criteri propri.
+
+---
+
 ## Limitazioni note
 
 - Le notifiche Android perse mentre il telefono è spento non sono
@@ -232,4 +267,4 @@ prima di averne bisogno.
 
 ## Licenza
 
-Progetto personale. Usalo come vuoi, senza garanzie.
+MIT. Vedi [LICENSE](LICENSE).
