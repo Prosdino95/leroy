@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- connect-src 'self': l'API è sulla stessa origine. Se un giorno finisce su
+     un dominio diverso va aggiornato qui, altrimenti le chiamate vengono
+     bloccate. 'unsafe-inline' serve solo agli stili, per l'attributo style
+     sulle barre del budget. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'">
+<title>Finanze</title>
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finanze">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ App ============ -->
+<div class="app" id="app" hidden>
+
+  <header class="topbar">
+    <div class="wrap">
+
+      <div class="barra-alta">
+        <div class="segmented" id="tipoSel">
+          <button type="button" class="seg" data-tipo="giorno">Giorno</button>
+          <button type="button" class="seg" data-tipo="mese">Mese</button>
+          <button type="button" class="seg" data-tipo="anno">Anno</button>
+        </div>
+        <div class="barra-azioni">
+          <button type="button" class="icona-btn" id="btnAggiorna" aria-label="Aggiorna" title="Aggiorna">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3.5 12a8.5 8.5 0 0 1 14.6-5.9"/><path d="M18.6 3v3.6H15"/>
+              <path d="M20.5 12a8.5 8.5 0 0 1-14.6 5.9"/><path d="M5.4 21v-3.6H9"/>
+            </svg>
+          </button>
+          <button type="button" class="icona-btn" id="btnImpostazioni" aria-label="Impostazioni" title="Impostazioni">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+              <circle cx="12" cy="12" r="6.2"/><circle cx="12" cy="12" r="2.4"/>
+              <g stroke-width="3"><path d="M12 2.3v2.6M12 19.1v2.6M2.3 12h2.6M19.1 12h2.6M5.15 5.15 7 7M17 17l1.85 1.85M18.85 5.15 17 7M7 17l-1.85 1.85"/></g>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="periodo">
+        <button type="button" class="icona-btn" id="periodoPrec" aria-label="Periodo precedente">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <button type="button" class="periodo-lab" id="periodoLabel" title="Torna al periodo corrente"></button>
+        <button type="button" class="icona-btn" id="periodoSucc" aria-label="Periodo successivo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <nav class="tabs" id="tabs">
+        <button type="button" class="tab" data-vista="riepilogo" aria-selected="true">Riepilogo</button>
+        <button type="button" class="tab" data-vista="movimenti" aria-selected="false">Movimenti</button>
+      </nav>
+
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="wrap">
+      <section class="vista" id="vistaRiepilogo" aria-label="Riepilogo"></section>
+      <section class="vista" id="vistaMovimenti" aria-label="Movimenti" hidden></section>
+    </div>
+  </main>
+
+  <button type="button" class="fab" id="fab" aria-label="Aggiungi movimento">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+</div>
+
+<!-- ============ Configurazione / Impostazioni ============ -->
+<div class="schermata" id="schermataConfig" hidden>
+  <div class="wrap">
+    <header class="schermata-head">
+      <h1 id="cfgTitolo">Configurazione</h1>
+      <button type="button" class="btn testo" id="cfgChiudi" hidden>Chiudi</button>
+    </header>
+
+    <p class="avviso" id="cfgAvviso" hidden></p>
+    <p class="nota" id="cfgIntro">Inserisci l'indirizzo dell'API e il token di accesso. Restano salvati solo su questo dispositivo.</p>
+
+    <form id="formConfig" novalidate>
+      <label class="campo">
+        <span class="campo-lab">URL dell'API</span>
+        <input id="cfgUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+               placeholder="https://esempio.duckdns.org/webhook/api-xxxx" required>
+      </label>
+      <label class="campo">
+        <span class="campo-lab">Token</span>
+        <span class="campo-affiancato">
+          <input id="cfgToken" type="password" autocomplete="off" spellcheck="false" required>
+          <button type="button" class="btn testo" id="cfgVedi">Mostra</button>
+        </span>
+      </label>
+      <p class="errore-inline" id="cfgErrore" hidden></p>
+      <button type="submit" class="btn primario">Salva</button>
+    </form>
+
+    <div class="schermata-piede">
+      <button type="button" class="btn pericolo" id="cfgCancella">Cancella configurazione</button>
+      <p class="versione" id="versione"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Fogli ============ -->
+<div class="velo" id="velo" hidden></div>
+
+<div class="foglio" id="foglioInserisci" hidden role="dialog" aria-modal="true" aria-labelledby="titInserisci">
+  <div class="foglio-head">
+    <h2 id="titInserisci">Nuovo movimento</h2>
+    <button type="button" class="icona-btn" data-chiudi aria-label="Chiudi">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <form class="foglio-corpo" id="formInserisci" novalidate>
+    <label class="campo">
+      <span class="campo-lab">Importo</span>
+      <input id="insImporto" class="input-grande" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00" required>
+    </label>
+    <div class="campo">
+      <span class="campo-lab">Tipo</span>
+      <div class="segmented" id="insTipo">
+        <button type="button" class="seg attivo" data-tipo="spesa">Spesa</button>
+        <button type="button" class="seg" data-tipo="entrata">Entrata</button>
+      </div>
+    </div>
+    <label class="campo">
+      <span class="campo-lab">Categoria</span>
+      <select id="insCategoria" required></select>
+    </label>
+    <label class="campo">
+      <span class="campo-lab">Conto</span>
+      <select id="insConto"></select>
+    </label>
+    <label class="campo">
+      <span class="campo-lab">Descrizione</span>
+      <input id="insDescrizione" type="text" autocomplete="off" placeholder="Opzionale">
+    </label>
+    <label class="campo">
+      <span class="campo-lab">Data</span>
+      <input id="insData" type="date">
+    </label>
+    <p class="errore-inline" id="insErrore" hidden></p>
+    <button type="submit" class="btn primario" id="insInvia" disabled>Aggiungi</button>
+  </form>
+</div>
+
+<div class="foglio" id="foglioDettaglio" hidden role="dialog" aria-modal="true" aria-labelledby="titDettaglio">
+  <div class="foglio-head">
+    <h2 id="titDettaglio">Movimento</h2>
+    <button type="button" class="icona-btn" data-chiudi aria-label="Chiudi">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="foglio-corpo">
+    <label class="campo" for="dettImporto">
+      <span class="campo-lab">Importo</span>
+      <span class="dett-importo-riga" id="dettImportoRiga">
+        <span class="dett-segno" id="dettSegno" aria-hidden="true"></span>
+        <input id="dettImporto" class="input-grande" type="text" inputmode="decimal"
+               autocomplete="off" aria-label="Importo" required>
+        <span class="dett-valuta" aria-hidden="true">€</span>
+      </span>
+    </label>
+    <dl class="dett-lista" id="dettLista"></dl>
+    <label class="campo">
+      <span class="campo-lab">Categoria</span>
+      <select id="dettCategoria"></select>
+    </label>
+    <p class="errore-inline" id="dettErrore" hidden></p>
+    <button type="button" class="btn primario" id="dettConferma">Conferma</button>
+    <div class="foglio-pericolo">
+      <button type="button" class="btn pericolo" id="dettElimina" aria-label="Elimina movimento">Elimina</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# === Segreti: mai nel repository ===
+.env
+*.env
+!.env.example
+infra/.env
+
+# Chiavi service account e credenziali scaricate
+*service-account*.json
+*credentials*.json
+*.pem
+*.key
+*.p12
+
+# === Dati personali ===
+# Export dello storico e file di lavoro: contengono transazioni reali
+*.csv
+!scripts/esempio-*.csv
+backup/
+*.sql
+*.sql.gz
+*.tar.gz
+
+# === Sistema e strumenti ===
+.DS_Store
+Thumbs.db
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# === Editor ===
+.vscode/
+.idea/
+*.swp
+*~
+
+# === Runtime ===
+*.log
+caddy_data/
+pg_data/
+n8n_data/
