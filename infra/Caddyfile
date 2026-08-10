@@ -1,0 +1,60 @@
+# Leroy — configurazione Caddy
+#
+# Caddy richiede e rinnova da solo il certificato Let's Encrypt: non serve
+# nessun cron, nessun certbot. Perché funzioni deve essere raggiungibile
+# sulla porta 80, che è quella usata dalla verifica ACME.
+#
+# I blocchi "handle" si escludono a vicenda e vengono valutati nell'ordine
+# in cui compaiono: la prima corrispondenza vince. Un reverse_proxy scritto
+# fuori da un handle varrebbe invece per tutte le richieste, sovrapponendosi
+# alla rotta dei file statici.
+
+{
+    email {$EMAIL}
+}
+
+{$DOMINIO} {
+
+    # File statici della PWA.
+    # handle_path (e non handle) rimuove il prefisso: /app/style.css viene
+    # cercato come /srv/app/style.css. Con handle semplice diventerebbe
+    # /srv/app/app/style.css e otterresti 404 su tutto.
+    handle_path /app/* {
+        root * /srv/app
+        file_server
+    }
+
+    # Tutto il resto: editor di n8n, API REST, webhook.
+    handle {
+        reverse_proxy n8n:5678
+    }
+}
+
+# --- Variante con l'editor protetto da password -----------------------------
+#
+# Lascia pubblici i webhook e i file statici, e mette una password davanti
+# all'editor e alle API interne di n8n. Genera l'hash con:
+#
+#   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'password'
+#
+# Ricorda di attivare N8N_PUSH_BACKEND=sse nel compose, altrimenti
+# l'aggiornamento in tempo reale dell'editor può smettere di funzionare.
+#
+# {$DOMINIO} {
+#     handle_path /app/* {
+#         root * /srv/app
+#         file_server
+#     }
+#
+#     @webhook path /webhook/* /webhook-test/* /webhook-waiting/*
+#     handle @webhook {
+#         reverse_proxy n8n:5678
+#     }
+#
+#     handle {
+#         basic_auth {
+#             admin HASH_QUI
+#         }
+#         reverse_proxy n8n:5678
+#     }
+# }
