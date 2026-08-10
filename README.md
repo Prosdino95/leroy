@@ -10,16 +10,6 @@ gratuito: il costo di esercizio è zero.
 
 ---
 
-## Sviluppo
-
-Leroy è stato progettato e scritto in coppia con un assistente AI, in sessioni
-di lavoro iterative: architettura, workflow, API e interfaccia sono nati da un
-dialogo e non da generazione automatica di codice non letto. Ogni componente è
-stato eseguito e verificato prima di essere considerato concluso, e diversi
-errori di progettazione sono emersi proprio costruendolo.
-
----
-
 ## Cosa fa
 
 Una spesa entra nel sistema senza che tu faccia nulla. La notifica della
@@ -34,8 +24,11 @@ inserisci in due secondi da un bot Telegram o dall'app.
   come riserva
 - **Deduplica** fra fonti: la stessa spesa vista da due canali diventa una
   riga sola
-- **Interfaccia mobile** installabile, con riepiloghi, budget per categoria e
-  inserimento rapido
+- **Riconciliazione degli addebiti annunciati**: una bolletta comunicata oggi e
+  addebitata fra due settimane resta una spesa sola, contata quando i soldi
+  escono davvero
+- **Interfaccia mobile** installabile, con riepiloghi, budget per categoria,
+  inserimento rapido e correzione dei movimenti
 - **Storico preservato**: i dati precedenti sono stati migrati e convivono con
   quelli nuovi
 
@@ -91,14 +84,30 @@ la toccherebbe.
 3. L'elaborazione tenta prima le regole deterministiche, che sono gratuite e
    istantanee; solo se falliscono interviene il modello linguistico
 4. Il risultato viene verificato: importo plausibile, categoria esistente
-5. Si controlla che non sia lo stesso movimento già arrivato da un altro
-   canale
-6. La riga viene scritta e ne arriva notifica su Telegram
-7. Se la fiducia nella categoria è bassa, la notifica chiede conferma — e la
+5. Si distingue un addebito già avvenuto da un addebito soltanto annunciato
+6. Si controlla che non sia lo stesso movimento già arrivato da un altro
+   canale, o che non chiuda un addebito annunciato in precedenza
+7. La riga viene scritta e ne arriva notifica su Telegram
+8. Se la fiducia nella categoria è bassa, la notifica chiede conferma — e la
    risposta genera una regola che rende superflua l'AI la volta successiva
 
 Quest'ultimo punto è il meccanismo su cui si regge l'economia del sistema: più
 lo usi, meno chiamate esterne servono.
+
+### Annunci e addebiti
+
+Una bolletta comunicata via email il 10 e addebitata sul conto il 27 sono lo
+stesso movimento, visto due volte a diciassette giorni di distanza. Nessuna
+finestra di deduplica ragionevole può collegarli, e allargarla abbastanza
+significherebbe collassare spese diverse ma di pari importo.
+
+Il sistema tratta quindi l'annuncio per quello che è: **una previsione**. Viene
+registrato in uno stato che non concorre ai totali ma resta visibile, e quando
+l'addebito arriva davvero la previsione viene chiusa e diventa la transazione,
+datata al giorno in cui i soldi sono usciti.
+
+Se l'addebito non si presenta entro qualche giorno dalla data prevista — banca
+con notifiche mute, telefono spento — il sistema lo chiede.
 
 ### Principi seguiti
 
@@ -224,41 +233,24 @@ prima di averne bisogno.
 
 ---
 
-### Revisione di sicurezza
-
-Il codice dell'app è stato sottoposto a una revisione mirata sulle classi di
-vulnerabilità rilevanti per un'applicazione di questo tipo:
-
-- iniezione nel DOM da dati non fidati — i contenuti arrivano da email,
-  notifiche e risposte di un modello linguistico, quindi vanno trattati come
-  ostili
-- gestione del token: dove è memorizzato, verso dove viaggia, dove non deve
-  comparire
-- politica di caching del service worker, perché non conservi dati personali
-  su disco
-- validazione di importi e date prima della scrittura
-- assenza di dipendenze esterne e di risorse caricate da terze parti
-
-Le correzioni emerse sono state applicate: obbligo di HTTPS e di stessa origine
-per l'endpoint, Content Security Policy restrittiva, eliminazione di ogni
-percorso in grado di scrivere HTML non controllato nel DOM.
-
-*Non è un audit professionale.* È un progetto personale, per un utente
-singolo, distribuito senza garanzie. Chi volesse riusarlo in un contesto
-diverso dovrebbe rivederlo con criteri propri.
-
----
-
 ## Limitazioni note
 
 - Le notifiche Android perse mentre il telefono è spento non sono
   recuperabili: a differenza delle email, non restano da nessuna parte. Tenere
-  attive più fonti mitiga il problema.
+  attive più fonti mitiga il problema, e gli addebiti annunciati vengono
+  comunque richiesti se non si presentano.
 - Alcune banche inviano notifiche prive di contenuto: per quelle il canale
   push non è utilizzabile.
 - I PDF privi di livello testo non vengono letti.
+- La riconciliazione di un addebito annunciato si basa su importo e data
+  prevista: due addebiti di pari importo attesi nello stesso periodo possono
+  essere scambiati.
+- Un addebito annunciato con importo errato non è correggibile dall'app: si
+  interviene sul foglio, oppure lo si annulla dal bot e si reinserisce.
 - Il budget per categoria è un valore unico, non storicizzato: modificandolo
   cambia anche il confronto con i mesi passati.
+- Non esiste il concetto di giroconto: spostare denaro fra due conti propri
+  viene registrato come una spesa e un'entrata.
 - Oltre qualche migliaio di righe la lettura del foglio inizia a farsi sentire.
   La contromisura è archiviare gli anni chiusi in un foglio separato.
 - Sistema pensato per un utente singolo.
@@ -267,4 +259,4 @@ diverso dovrebbe rivederlo con criteri propri.
 
 ## Licenza
 
-MIT. Vedi [LICENSE](LICENSE).
+Progetto personale. Usalo come vuoi, senza garanzie.

@@ -28,7 +28,7 @@ Il foglio principale. Una riga per movimento.
 | `testo_grezzo` | contenuto originale, per diagnosi |
 | `hash_dedup` | 16 caratteri esadecimali, chiave della riga |
 | `confidenza` | da `0.00` a `1.00` |
-| `stato` | `confermata`, `da_verificare` o `eliminata` |
+| `stato` | `confermata`, `da_verificare`, `attesa` o `eliminata` |
 
 ### Domini dei valori
 
@@ -40,8 +40,25 @@ Il foglio principale. Una riga per movimento.
 
 **`stato`** — `confermata` è il caso normale. `da_verificare` marca le righe
 su cui il sistema ha dei dubbi: categoria non riconosciuta, importo ambiguo,
-confidenza sotto soglia. `eliminata` è una cancellazione logica: la riga resta
-nel foglio ma viene esclusa da ogni lettura.
+confidenza sotto soglia. `attesa` è un addebito annunciato ma non ancora
+avvenuto, escluso dai totali. `eliminata` è una cancellazione logica: la riga
+resta nel foglio ma viene esclusa da ogni lettura.
+
+### Le attese
+
+Un'attesa non è una riga a parte: **è la transazione stessa, scritta in
+anticipo**. Quando arriva l'addebito reale, quella riga viene aggiornata invece
+di scriverne una nuova.
+
+In stato `attesa`, `data_evento` contiene la **data prevista** dell'addebito.
+Alla riconciliazione viene sostituita con quella reale, perché una spesa vale
+nel mese in cui i soldi escono.
+
+Categoria, esercente e note sopravvivono alla riconciliazione: sono quelle
+dedotte dall'email, che conosceva il fornitore, mentre la notifica bancaria da
+sola avrebbe prodotto qualcosa di generico. Per questo il nodo che chiude
+un'attesa aggiorna solo data, importo, conto, fonte e stato — un campo mappato
+a vuoto cancellerebbe il resto.
 
 ### Note importanti
 

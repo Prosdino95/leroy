@@ -71,6 +71,11 @@ granularità:
     { "nome": "Ristorante", "tipo": "spesa",   "speso": 151.00,  "budget": 134 },
     { "nome": "Stipendio",  "tipo": "entrata", "speso": 2400.00, "budget": 0 }
   ],
+  "attese": [
+    { "hash": "9c1e40ab7d2f5583", "data": "2026-08-27", "importo": 36.55,
+      "etichetta": "octopus energy", "categoria": "Bollette" }
+  ],
+  "attese_totale": 36.55,
   "config": {
     "categorie_spesa":   ["Affitto", "Supermercato", "..."],
     "categorie_entrata": ["Stipendio", "Bonifici", "Rimborsi"],
@@ -88,7 +93,12 @@ Note:
 - `budget: 0` significa nessun budget impostato
 - `config` viaggia qui perché all'apertura basti una sola chiamata per avere
   tutto il necessario a disegnare le schermate e popolare i form
-- le righe in stato `eliminata` non vengono conteggiate
+- le righe in stato `eliminata` e `attesa` non vengono conteggiate nei totali
+- **`attese`** sono addebiti annunciati e non ancora avvenuti: non fanno parte
+  di `uscite` né di `saldo`, e vanno mostrati a parte. `attese_totale` è la
+  loro somma
+- a differenza di tutto il resto, **le attese non sono filtrate per periodo**:
+  quello che sta per uscire interessa anche guardando un mese passato
 
 ---
 
@@ -139,7 +149,8 @@ Note:
 - vengono restituiti solo i campi necessari: il contenuto grezzo di origine,
   che può essere lungo migliaia di caratteri, resta sul server
 - ordinamento per data decrescente
-- le righe `eliminata` non compaiono
+- le righe `eliminata` e `attesa` non compaiono: le seconde si consultano dal
+  campo `attese` del riepilogo e si confermano dal bot Telegram
 
 ---
 

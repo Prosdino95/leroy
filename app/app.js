@@ -3,7 +3,7 @@
    Parla solo con l'API descritta nella specifica: un unico POST con
    header x-push-token e campo "azione" come router. */
 
-const VERSIONE = '1.1.0';
+const VERSIONE = '1.2.0';
 const TIMEOUT_MS = 15000;
 
 const CHIAVI = {
@@ -120,7 +120,10 @@ function dataLocale(iso) {
 const FMT_GIORNO = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 const FMT_MESE = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' });
 
+const FMT_BREVE = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' });
+
 const etichettaGiorno = iso => FMT_GIORNO.format(dataLocale(iso));
+const dataBreve = iso => FMT_BREVE.format(dataLocale(iso));
 
 /* ============ stato ============ */
 
@@ -502,6 +505,46 @@ function renderRiepilogo() {
           el('span', { class: 'cat-nome', text: c.nome }),
           el('span', { class: 'cat-imp positivo', text: eur(c.speso) })))))));
   }
+
+  /* --- in arrivo --- */
+  const attese = Array.isArray(r.attese) ? r.attese : [];
+  if (attese.length) box.append(sezioneAttese(attese, r.attese_totale));
+}
+
+/* Addebiti annunciati e non ancora avvenuti: non entrano nei totali del
+   periodo, sola lettura (si confermano dal bot Telegram). */
+function sezioneAttese(attese, totale) {
+  const somma = Number.isFinite(Number(totale))
+    ? num(totale)
+    : attese.reduce((s, a) => s + num(a.importo), 0);
+
+  const oggi = oggiISO();
+  const ordinate = attese.slice().sort((x, y) => String(x.data || '').localeCompare(String(y.data || '')));
+
+  return el('section', { class: 'sezione' },
+    el('div', { class: 'sezione-head' },
+      el('h2', { text: 'In arrivo' }),
+      el('span', { class: 'sezione-tot', text: eur(somma) })),
+    el('div', { class: 'attese-lista' }, ordinate.map(a => {
+      const inRitardo = !!a.data && a.data < oggi;
+      const titolo = (a.etichetta && String(a.etichetta).trim()) || a.categoria || '(senza descrizione)';
+
+      const tit = el('span', { class: 'attesa-tit' });
+      if (inRitardo) tit.append(svgIcona('avviso'));
+      tit.append(document.createTextNode(titolo));
+
+      const sub = el('span', { class: 'attesa-sub' });
+      sub.append(document.createTextNode([a.categoria, a.data ? dataBreve(a.data) : null]
+        .filter(Boolean).join(' · ')));
+      if (inRitardo) {
+        sub.append(document.createTextNode(' · '));
+        sub.append(el('span', { class: 'ritardo-nota', text: 'in ritardo' }));
+      }
+
+      return el('div', { class: 'attesa' + (inRitardo ? ' in-ritardo' : '') },
+        el('span', { class: 'attesa-main' }, tit, sub),
+        el('span', { class: 'attesa-imp', text: eur(a.importo) }));
+    })));
 }
 
 function rigaSpesa(c) {

@@ -253,6 +253,53 @@ button { font: inherit; color: inherit; }
   font-weight: 600;
 }
 
+.sezione-tot {
+  font-size: .9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* in arrivo */
+.attese-lista { display: flex; flex-direction: column; }
+.attesa {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 0 -12px;
+  border-bottom: 1px solid var(--bordo);
+}
+.attesa:first-child { border-top: 1px solid var(--bordo); }
+.attesa.in-ritardo { background: var(--ambra-bg); }
+.attesa-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.attesa-tit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attesa-tit svg { width: 15px; height: 15px; flex: none; color: var(--ambra); }
+.attesa-sub {
+  font-size: .8125rem;
+  color: var(--testo-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attesa-sub .ritardo-nota { color: var(--ambra); font-weight: 600; }
+.attesa-imp {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--testo-2);
+}
+
 /* categorie */
 .cat-lista { display: flex; flex-direction: column; }
 .cat {

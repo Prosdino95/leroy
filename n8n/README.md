@@ -1,7 +1,7 @@
 # Leroy — workflow n8n
 
-Sei workflow. Cinque raccolgono e processano i movimenti, uno espone l'API che
-alimenta la PWA.
+Sette workflow. Cinque raccolgono e processano i movimenti, uno sorveglia gli
+addebiti annunciati, uno espone l'API che alimenta la PWA.
 
 ---
 
@@ -14,8 +14,9 @@ Ingest Gmail    ─┐
 Ingest Outlook  ─┼──→  Processa movimento  ──→  Google Sheet
 Ingest push     ─┘
 
-Telegram  ──→  (logica propria)  ──→  Google Sheet
-API app   ──→  (logica propria)  ──→  Google Sheet
+Telegram         ──→  (logica propria)  ──→  Google Sheet
+API app          ──→  (logica propria)  ──→  Google Sheet
+Controllo attese ──→  (schedulato)      ──→  Telegram
 ```
 
 Un ingestore fa una cosa sola: prendere ciò che arriva da un canale e
@@ -76,6 +77,15 @@ Il cuore. Riceve la struttura comune ed esegue in sequenza: estrazione,
 categorizzazione, verifica di plausibilità, controllo duplicati, scrittura,
 notifica.
 
+Prima di scrivere, il workflow distingue un addebito già avvenuto da un
+addebito soltanto annunciato — una bolletta con scadenza futura, una fattura da
+pagare. Gli annunci vengono registrati in uno stato che non concorre ai totali;
+quando l'addebito reale arriva, viene cercata l'attesa corrispondente per
+importo e data prevista, e quella riga viene chiusa invece di scriverne una
+nuova. Il risultato è una transazione sola, datata al giorno in cui i soldi
+sono usciti, con la categoria dedotta dall'email — che conosceva il fornitore,
+mentre la notifica bancaria da sola avrebbe prodotto qualcosa di generico.
+
 L'estrazione procede per livelli. Prima gli estrattori deterministici, legati
 al singolo mittente, che sono gratuiti e sempre identici a se stessi. Poi una
 ricerca generica del totale ancorata alle formule ricorrenti dei documenti
@@ -86,6 +96,18 @@ Ogni risposta del modello viene verificata contro dati reali: la categoria
 deve esistere nel foglio, l'importo deve essere coerente con quanto trovato
 nel testo. Se qualcosa non torna, il movimento entra ugualmente ma marcato da
 verificare, con l'avviso di cosa non convinceva.
+
+### `controllo-attese`
+
+Schedulato quotidianamente. Cerca gli addebiti annunciati la cui data prevista
+è passata da qualche giorno senza che sia arrivato il corrispondente addebito
+reale, e li segnala su Telegram con due bottoni: registrarli comunque, oppure
+annullarli.
+
+Serve a coprire il caso in cui la conferma non arriva mai — banca che invia
+notifiche prive di contenuto, telefono spento, app di cattura sospesa dal
+sistema. Senza, una spesa annunciata e mai riconciliata resterebbe fuori dai
+conti in silenzio.
 
 ### `api-app`
 
