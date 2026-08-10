@@ -3,7 +3,7 @@
    Parla solo con l'API descritta nella specifica: un unico POST con
    header x-push-token e campo "azione" come router. */
 
-const VERSIONE = '1.2.0';
+const VERSIONE = '1.3.0';
 const TIMEOUT_MS = 15000;
 
 const CHIAVI = {
@@ -141,6 +141,7 @@ const stato = {
   filtro: { categoria: null, soloDaVerificare: false },
 
   movAperto: null,
+  dettAttesa: false,
 };
 
 function periodoStr() {
@@ -507,12 +508,17 @@ function renderRiepilogo() {
   }
 
   /* --- in arrivo --- */
+  // Le attese non sono filtrate per periodo dall'API: su un periodo passato il
+  // loro totale non avrebbe alcun rapporto con i numeri qui sopra. Si mostrano
+  // solo se il periodo contiene oggi o è futuro, confrontando le stringhe ISO.
   const attese = Array.isArray(r.attese) ? r.attese : [];
-  if (attese.length) box.append(sezioneAttese(attese, r.attese_totale));
+  const p = periodoStr();
+  const periodoPertinente = p >= oggiISO().slice(0, p.length);
+  if (attese.length && periodoPertinente) box.append(sezioneAttese(attese, r.attese_totale));
 }
 
 /* Addebiti annunciati e non ancora avvenuti: non entrano nei totali del
-   periodo, sola lettura (si confermano dal bot Telegram). */
+   periodo. Si confermano dal bot Telegram, ma da qui si possono correggere. */
 function sezioneAttese(attese, totale) {
   const somma = Number.isFinite(Number(totale))
     ? num(totale)
@@ -541,7 +547,11 @@ function sezioneAttese(attese, totale) {
         sub.append(el('span', { class: 'ritardo-nota', text: 'in ritardo' }));
       }
 
-      return el('div', { class: 'attesa' + (inRitardo ? ' in-ritardo' : '') },
+      return el('button', {
+        class: 'attesa' + (inRitardo ? ' in-ritardo' : ''),
+        type: 'button',
+        onclick: () => apriDettaglio(a, true),
+      },
         el('span', { class: 'attesa-main' }, tit, sub),
         el('span', { class: 'attesa-imp', text: eur(a.importo) }));
     })));
@@ -763,11 +773,17 @@ function categorieDi(tipo) {
   return Array.isArray(lista) ? lista.filter(x => typeof x === 'string' && x !== '') : [];
 }
 
-function apriDettaglio(m) {
+/* Lo stesso foglio serve i movimenti registrati e le attese: un'attesa si
+   corregge, non si conferma, quindi cambiano intestazione, etichetta della
+   data, testo del pulsante e lo "stato" inviato a correggi. */
+function apriDettaglio(m, attesa = false) {
   stato.movAperto = m;
+  stato.dettAttesa = attesa;
   const entrata = m.tipo === 'entrata';
 
-  $('#titDettaglio').textContent = (m.etichetta && String(m.etichetta).trim()) || m.categoria || 'Movimento';
+  $('#titDettaglio').textContent = attesa
+    ? 'Addebito previsto'
+    : ((m.etichetta && String(m.etichetta).trim()) || m.categoria || 'Movimento');
 
   // L'importo è modificabile, il segno no: lo determina "tipo".
   $('#dettSegno').textContent = entrata ? '+' : '−';
@@ -780,13 +796,21 @@ function apriDettaglio(m) {
     dl.append(el('dt', { text: chiave }));
     dl.append(el('dd', {}, valore));
   };
-  voce('Data', m.data ? etichettaGiorno(m.data) : '—');
-  voce('Tipo', entrata ? 'Entrata' : 'Spesa');
-  voce('Conto', m.conto || '—');
-  voce('Fonte', m.fonte || '—');
-  voce('Stato', m.stato === 'da_verificare'
-    ? el('span', { class: 'badge', text: 'Da verificare' })
-    : document.createTextNode('Confermata'));
+  if (attesa) {
+    // L'API non manda conto, fonte e stato per le attese: si omettono.
+    const descrizione = m.etichetta && String(m.etichetta).trim();
+    if (descrizione) voce('Descrizione', descrizione);
+    voce('Data prevista', m.data ? etichettaGiorno(m.data) : '—');
+    voce('Tipo', entrata ? 'Entrata' : 'Spesa');
+  } else {
+    voce('Data', m.data ? etichettaGiorno(m.data) : '—');
+    voce('Tipo', entrata ? 'Entrata' : 'Spesa');
+    voce('Conto', m.conto || '—');
+    voce('Fonte', m.fonte || '—');
+    voce('Stato', m.stato === 'da_verificare'
+      ? el('span', { class: 'badge', text: 'Da verificare' })
+      : document.createTextNode('Confermata'));
+  }
 
   const sel = $('#dettCategoria');
   sel.replaceChildren();
@@ -797,13 +821,26 @@ function apriDettaglio(m) {
   sel.value = m.categoria || (opzioni[0] || '');
 
   $('#dettErrore').hidden = true;
-  $('#dettConferma').textContent = 'Conferma';
+  $('#dettConferma').textContent = etichettaSalva();
   const btnElimina = $('#dettElimina');
   btnElimina.textContent = 'Elimina';
   btnElimina.disabled = false;
   validaDettaglio();
 
   apriFoglio('#foglioDettaglio');
+}
+
+const etichettaSalva = () => (stato.dettAttesa ? 'Salva' : 'Conferma');
+
+/* Le attese arrivano dentro la risposta di riepilogo: è quello il caricamento
+   che le rinfresca. I movimenti registrati stanno nella lista dei movimenti. */
+function ricaricaDopoDettaglio() {
+  if (stato.dettAttesa) {
+    aggiornaTutto();
+  } else {
+    caricaRiepilogo();
+    caricaMovimenti();
+  }
 }
 
 function validaImportoDett() {
@@ -844,13 +881,16 @@ async function confermaMovimento() {
   btnElimina.disabled = true;
   btn.textContent = 'Invio…';
   try {
-    await api('correggi', { hash: m.hash, categoria, stato: 'confermata', importo });
+    // Un'attesa resta un'attesa: con "confermata" il sistema la darebbe per
+    // avvenuta, entrerebbe nei totali del mese e non verrebbe più riconciliata
+    // quando l'addebito arriva davvero.
+    const nuovoStato = stato.dettAttesa ? 'attesa' : 'confermata';
+    await api('correggi', { hash: m.hash, categoria, stato: nuovoStato, importo });
     chiudiFogli();
-    toast('Movimento confermato.');
-    caricaRiepilogo();
-    caricaMovimenti();
+    toast(stato.dettAttesa ? 'Addebito previsto aggiornato.' : 'Movimento confermato.');
+    ricaricaDopoDettaglio();
   } catch (err) {
-    btn.textContent = 'Conferma';
+    btn.textContent = etichettaSalva();
     btnElimina.disabled = false;
     validaDettaglio();
     if (gestisciAuth(err)) return;
@@ -878,9 +918,8 @@ async function eliminaMovimento() {
   try {
     await api('elimina', { hash: m.hash });
     chiudiFogli();
-    toast('Movimento eliminato.');
-    caricaRiepilogo();
-    caricaMovimenti();
+    toast(stato.dettAttesa ? 'Addebito previsto eliminato.' : 'Movimento eliminato.');
+    ricaricaDopoDettaglio();
   } catch (err) {
     btnElimina.textContent = 'Elimina';
     btnElimina.disabled = false;

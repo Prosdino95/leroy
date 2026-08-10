@@ -266,9 +266,16 @@ button { font: inherit; color: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
+  width: calc(100% + 24px);
   padding: 10px 12px;
   margin: 0 -12px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
   border-bottom: 1px solid var(--bordo);
+  cursor: pointer;
 }
 .attesa:first-child { border-top: 1px solid var(--bordo); }
 .attesa.in-ritardo { background: var(--ambra-bg); }
