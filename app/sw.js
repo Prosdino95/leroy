@@ -6,7 +6,7 @@
    La strategia è cache-first su index.html e app.js: se sw.js resta identico
    il browser non reinstalla nulla e continui a vedere la versione precedente
    anche dopo aver copiato i file nuovi sul server. */
-const VERSIONE = 'v1.3.0';
+const VERSIONE = 'v1.4.0';
 const CACHE = `finanze-shell-${VERSIONE}`;
 const PREFISSO = 'finanze-shell-';
 

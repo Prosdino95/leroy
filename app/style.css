@@ -253,6 +253,65 @@ button { font: inherit; color: inherit; }
   font-weight: 600;
 }
 
+/* andamento a 12 mesi */
+.andamento { margin-top: 20px; }
+.grafico { display: flex; flex-direction: column; gap: 5px; }
+.grafico-barre {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 84px;
+}
+.grafico-media {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--testo-3);
+  pointer-events: none;
+}
+.barra-mese {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.barra-col {
+  width: 100%;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+  background: var(--bordo-2);
+}
+.barra-col.scelto { background: var(--accento); }
+/* Il mese in corso è parziale: solo contorno, per non confrontarlo a occhio. */
+.barra-col.parziale {
+  background: none;
+  border: 1px dashed var(--bordo-2);
+  border-bottom: 0;
+}
+.barra-col.parziale.scelto { border-color: var(--accento); }
+
+.grafico-etichette { display: flex; gap: 3px; }
+.etichetta-mese {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: .6875rem;
+  line-height: 1.25;
+  color: var(--testo-3);
+}
+.etichetta-mese.scelto { color: var(--testo); font-weight: 600; }
+.etichetta-mese .lab-a { font-size: .625rem; }
+.media-lab { color: var(--testo-3); font-weight: 400; }
+
 .sezione-tot {
   font-size: .9375rem;
   font-weight: 600;

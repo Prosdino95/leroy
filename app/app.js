@@ -3,7 +3,7 @@
    Parla solo con l'API descritta nella specifica: un unico POST con
    header x-push-token e campo "azione" come router. */
 
-const VERSIONE = '1.3.0';
+const VERSIONE = '1.4.0';
 const TIMEOUT_MS = 15000;
 
 const CHIAVI = {
@@ -121,6 +121,7 @@ const FMT_GIORNO = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'lo
 const FMT_MESE = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' });
 
 const FMT_BREVE = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' });
+const FMT_NARROW = new Intl.DateTimeFormat('it-IT', { month: 'narrow' });
 
 const etichettaGiorno = iso => FMT_GIORNO.format(dataLocale(iso));
 const dataBreve = iso => FMT_BREVE.format(dataLocale(iso));
@@ -136,6 +137,7 @@ const stato = {
   riep: null, rStato: 'idle', rErrore: '',
   config: null,
   budgetMode: false,
+  and: null,        // serie a 12 mesi: non dipende dal periodo selezionato
 
   mov: null, mStato: 'idle', mErrore: '', mScaduto: true,
   filtro: { categoria: null, soloDaVerificare: false },
@@ -337,6 +339,24 @@ async function caricaMovimenti() {
   if (errore) gestisciAuth(errore);
 }
 
+let seqAnd = 0;
+
+/* La serie non dipende dal periodo: si carica all'avvio e poi solo con
+   l'aggiornamento manuale. Se fallisce non si mostra e non disturba il
+   riepilogo: è un complemento, non un dato essenziale. */
+async function caricaAndamento() {
+  const mio = ++seqAnd;
+  try {
+    const d = await api('andamento', { categoria: null });
+    if (mio !== seqAnd) return;
+    stato.and = (d && Array.isArray(d.mesi) && d.mesi.length) ? d : null;
+  } catch {
+    if (mio !== seqAnd) return;
+    stato.and = null;
+  }
+  if (stato.vista === 'riepilogo' && !stato.budgetMode) renderRiepilogo();
+}
+
 function inCaricamento() {
   return stato.rStato === 'loading' || stato.mStato === 'loading';
 }
@@ -349,6 +369,13 @@ function aggiornaTutto() {
   caricaRiepilogo();
   if (stato.vista === 'movimenti') caricaMovimenti();
   else stato.mScaduto = true;
+}
+
+/* Aggiornamento manuale: l'unico momento, oltre all'avvio, in cui si
+   rilegge anche l'andamento. */
+function aggiornaManuale() {
+  caricaAndamento();
+  aggiornaTutto();
 }
 
 /* ============ barra del periodo ============ */
@@ -391,6 +418,16 @@ function vaiAOggi() {
   const oggi = oggiISO();
   if (oggi === stato.rif) return;
   stato.rif = oggi;
+  cambiaPeriodo();
+}
+
+/* Dal grafico: "2026-08" diventa il periodo mese corrispondente. */
+function vaiAlMese(mese) {
+  if (!/^\d{4}-\d{2}$/.test(mese)) return;
+  const rif = `${mese}-01`;
+  if (stato.tipo === 'mese' && stato.rif === rif) return;
+  stato.tipo = 'mese';
+  stato.rif = rif;
   cambiaPeriodo();
 }
 
@@ -448,6 +485,9 @@ function renderRiepilogo() {
         class: 'saldo-val' + (saldo > 0 ? ' positivo' : saldo < 0 ? ' negativo' : ''),
         text: eurSegnato(saldo),
       }))));
+
+  const grafico = sezioneAndamento();
+  if (grafico) box.append(grafico);
 
   const daVerificare = Math.trunc(num(r.da_verificare));
   if (daVerificare > 0) {
@@ -515,6 +555,68 @@ function renderRiepilogo() {
   const p = periodoStr();
   const periodoPertinente = p >= oggiISO().slice(0, p.length);
   if (attese.length && periodoPertinente) box.append(sezioneAttese(attese, r.attese_totale));
+}
+
+/* Andamento delle uscite sugli ultimi 12 mesi conclusi più quello in corso.
+   Barre in HTML con altezza in percentuale, niente canvas. */
+function sezioneAndamento() {
+  const d = stato.and;
+  if (!d) return null;
+  const mesi = d.mesi.filter(m => m && /^\d{4}-\d{2}$/.test(String(m.mese)));
+  if (!mesi.length) return null;
+
+  const meseCorrente = oggiISO().slice(0, 7);
+  // Con il periodo su un anno non c'è un mese selezionato da evidenziare.
+  const meseScelto = stato.tipo === 'anno' ? null : stato.rif.slice(0, 7);
+  const media = Number.isFinite(Number(d.media_uscite)) ? num(d.media_uscite) : null;
+  const massimo = Math.max(...mesi.map(m => num(m.uscite)), media || 0);
+
+  const testa = el('div', { class: 'sezione-head' }, el('h2', { text: 'Andamento' }));
+  if (media !== null) {
+    testa.append(el('span', { class: 'sezione-tot' },
+      el('span', { class: 'media-lab', text: 'media ' }),
+      document.createTextNode(eur(media))));
+  }
+
+  const barre = el('div', { class: 'grafico-barre' });
+  if (media !== null && massimo > 0) {
+    barre.append(el('div', {
+      class: 'grafico-media', 'aria-hidden': 'true',
+      style: `bottom:${(media / massimo * 100).toFixed(2)}%`,
+    }));
+  }
+
+  const etichette = el('div', { class: 'grafico-etichette', 'aria-hidden': 'true' });
+  let annoPrec = null;
+
+  for (const m of mesi) {
+    const mese = String(m.mese);
+    const primoDelMese = `${mese}-01`;
+    const uscite = num(m.uscite);
+    const parziale = mese === meseCorrente;
+    const scelto = mese === meseScelto;
+    const alt = massimo > 0 ? Math.max(uscite > 0 ? 2 : 0, uscite / massimo * 100) : 0;
+    const nome = FMT_MESE.format(dataLocale(primoDelMese));
+
+    barre.append(el('button', {
+      class: 'barra-mese', type: 'button',
+      'aria-label': `${nome}: ${eur(uscite)}` + (parziale ? ' (mese in corso, parziale)' : ''),
+      'aria-current': scelto ? 'true' : null,
+      onclick: () => vaiAlMese(mese),
+    }, el('span', {
+      class: 'barra-col' + (parziale ? ' parziale' : '') + (scelto ? ' scelto' : ''),
+      style: `height:${alt.toFixed(2)}%`,
+    })));
+
+    const anno = mese.slice(0, 4);
+    etichette.append(el('span', { class: 'etichetta-mese' + (scelto ? ' scelto' : '') },
+      el('span', { class: 'lab-m', text: FMT_NARROW.format(dataLocale(primoDelMese)) }),
+      el('span', { class: 'lab-a', text: anno === annoPrec ? '' : `'${anno.slice(2)}` })));
+    annoPrec = anno;
+  }
+
+  return el('section', { class: 'andamento' }, testa,
+    el('div', { class: 'grafico' }, barre, etichette));
 }
 
 /* Addebiti annunciati e non ancora avvenuti: non entrano nei totali del
@@ -1053,7 +1155,7 @@ function collegaEventi() {
   $('#periodoPrec').addEventListener('click', () => spostaPeriodo(-1));
   $('#periodoSucc').addEventListener('click', () => spostaPeriodo(1));
   $('#periodoLabel').addEventListener('click', vaiAOggi);
-  $('#btnAggiorna').addEventListener('click', aggiornaTutto);
+  $('#btnAggiorna').addEventListener('click', aggiornaManuale);
   $('#btnImpostazioni').addEventListener('click', () => apriConfig());
 
   $('#tabs').addEventListener('click', ev => {
@@ -1126,7 +1228,7 @@ function collegaEventi() {
     chiudiConfig();
     toast('Configurazione salvata.');
     stato.mScaduto = true;
-    aggiornaTutto();
+    aggiornaManuale();
   });
 
   $('#cfgVedi').addEventListener('click', () => {
@@ -1145,6 +1247,7 @@ function collegaEventi() {
     stato.cfg = { url: '', token: '' };
     stato.riep = null; stato.rStato = 'idle';
     stato.config = null;
+    stato.and = null;
     stato.mov = null; stato.mStato = 'idle'; stato.mScaduto = true;
     aggiornaFab();
     apriConfig('Configurazione cancellata.');
@@ -1162,7 +1265,7 @@ function avvia() {
     apriConfig();
   } else {
     chiudiConfig();
-    aggiornaTutto();
+    aggiornaManuale();
   }
 
   if ('serviceWorker' in navigator) {
