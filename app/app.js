@@ -3,14 +3,17 @@
    Parla solo con l'API descritta nella specifica: un unico POST con
    header x-push-token e campo "azione" come router. */
 
-const VERSIONE = '1.4.0';
+const VERSIONE = '1.5.0';
 const TIMEOUT_MS = 15000;
 
 const CHIAVI = {
   url: 'finanze.api_url',
   token: 'finanze.token',
   periodo: 'finanze.periodo',
+  privacy: 'finanze.privacy',
 };
+
+const RITARDO_RICERCA = 400;
 
 /* Le sole icone disegnate da JS. Sono costanti chiuse: svgIcona() accetta
    esclusivamente queste chiavi, così nessun testo che arriva dall'API può
@@ -65,12 +68,19 @@ const NF_EUR = new Intl.NumberFormat('it-IT', {
 });
 
 const num = v => (typeof v === 'number' && isFinite(v)) ? v : (isFinite(Number(v)) ? Number(v) : 0);
-const eur = v => NF_EUR.format(num(v));
+
+/* Modalità privacy: si maschera qui, nell'unico punto da cui passa ogni
+   importo mostrato — totali, categorie, budget, movimenti, attese, grafico,
+   etichette di accessibilità. Larghezza fissa per non scomporre il layout.
+   I campi modificabili usano importoModificabile(), quindi restano reali. */
+const MASCHERA = '••••• €';
+
+const eur = v => (stato.privacy ? MASCHERA : NF_EUR.format(num(v)));
 
 function eurSegnato(v) {
   const n = num(v);
   const segno = n > 0 ? '+' : n < 0 ? '−' : '';
-  return segno + NF_EUR.format(Math.abs(n));
+  return segno + (stato.privacy ? MASCHERA : NF_EUR.format(Math.abs(n)));
 }
 
 /* Importo da mettere in un campo modificabile: virgola decimale, due decimali,
@@ -142,8 +152,13 @@ const stato = {
   mov: null, mStato: 'idle', mErrore: '', mScaduto: true,
   filtro: { categoria: null, soloDaVerificare: false },
 
+  // Ricerca: ignora il periodo e guarda tutto lo storico.
+  ric: { q: '', dati: null, stato: 'idle', errore: '' },
+
   movAperto: null,
   dettAttesa: false,
+
+  privacy: false,
 };
 
 function periodoStr() {
@@ -183,10 +198,13 @@ class ErroreApi extends Error {
     super(messaggio);
     this.auth = !!extra.auth;
     this.timeout = !!extra.timeout;
+    this.annullata = !!extra.annullata;
   }
 }
 
-async function api(azione, corpo = {}) {
+/* segnale: AbortSignal opzionale per annullare dall'esterno una chiamata
+   ancora in volo (serve alla ricerca mentre si digita). */
+async function api(azione, corpo = {}, segnale = null) {
   if (!stato.cfg.url || !stato.cfg.token) {
     throw new ErroreApi('Configurazione mancante: inserisci URL e token.', { auth: true });
   }
@@ -194,6 +212,12 @@ async function api(azione, corpo = {}) {
   const ctrl = new AbortController();
   let scaduto = false;
   const timer = setTimeout(() => { scaduto = true; ctrl.abort(); }, TIMEOUT_MS);
+
+  const propaga = () => ctrl.abort();
+  if (segnale) {
+    if (segnale.aborted) ctrl.abort();
+    else segnale.addEventListener('abort', propaga, { once: true });
+  }
 
   let res;
   try {
@@ -205,12 +229,16 @@ async function api(azione, corpo = {}) {
       cache: 'no-store',
     });
   } catch {
+    if (segnale && segnale.aborted) {
+      throw new ErroreApi('Richiesta annullata.', { annullata: true });
+    }
     if (scaduto) {
       throw new ErroreApi(`La richiesta ha superato i ${TIMEOUT_MS / 1000} secondi senza risposta.`, { timeout: true });
     }
     throw new ErroreApi("Impossibile raggiungere l'API. Controlla la rete e l'URL configurato.");
   } finally {
     clearTimeout(timer);
+    if (segnale) segnale.removeEventListener('abort', propaga);
   }
 
   if (res.status === 401 || res.status === 403) {
@@ -376,6 +404,7 @@ function aggiornaTutto() {
 function aggiornaManuale() {
   caricaAndamento();
   aggiornaTutto();
+  if (stato.ric.q !== '') eseguiRicerca(stato.ric.q);
 }
 
 /* ============ barra del periodo ============ */
@@ -440,7 +469,7 @@ function mostraVista(vista) {
   for (const t of $$('#tabs .tab')) {
     t.setAttribute('aria-selected', String(t.dataset.vista === vista));
   }
-  if (vista === 'movimenti' && (stato.mScaduto || stato.mov === null)) caricaMovimenti();
+  if (vista === 'movimenti' && stato.ric.q === '' && (stato.mScaduto || stato.mov === null)) caricaMovimenti();
   window.scrollTo({ top: 0 });
 }
 
@@ -494,6 +523,8 @@ function renderRiepilogo() {
     box.append(el('button', {
       class: 'banner', type: 'button',
       onclick: () => {
+        // Una ricerca attiva coprirebbe il filtro: si azzera.
+        azzeraRicerca();
         stato.filtro = { categoria: null, soloDaVerificare: true };
         stato.mScaduto = true;
         mostraVista('movimenti');
@@ -705,6 +736,7 @@ function rigaSpesa(c) {
   return el('button', {
     class: 'cat', type: 'button',
     onclick: () => {
+      azzeraRicerca();
       stato.filtro = { categoria: c.nome, soloDaVerificare: false };
       stato.mScaduto = true;
       mostraVista('movimenti');
@@ -751,8 +783,25 @@ async function salvaBudget() {
 /* ---------- Vista 2: movimenti ---------- */
 
 function renderMovimenti() {
-  const box = $('#vistaMovimenti');
+  const box = $('#listaMovimenti');
   box.replaceChildren();
+  renderRiepilogoRicerca();
+
+  // Ricerca attiva: la lista mostra i risultati di "cerca", non quelli del periodo.
+  if (stato.ric.q !== '') {
+    if (stato.ric.stato === 'loading') { box.append(scheletro(6)); return; }
+    if (stato.ric.stato === 'error') {
+      box.append(bloccoErrore(stato.ric.errore, () => eseguiRicerca(stato.ric.q)));
+      return;
+    }
+    const trovati = (stato.ric.dati && Array.isArray(stato.ric.dati.movimenti)) ? stato.ric.dati.movimenti : [];
+    if (!trovati.length) {
+      box.append(el('p', { class: 'vuoto', text: `Nessun movimento trovato per «${stato.ric.q}».` }));
+      return;
+    }
+    box.append(...gruppiPerGiorno(trovati));
+    return;
+  }
 
   const chips = el('div', { class: 'chips' });
   if (stato.filtro.categoria) {
@@ -784,6 +833,12 @@ function renderMovimenti() {
     return;
   }
 
+  box.append(...gruppiPerGiorno(movimenti));
+}
+
+/* Lista raggruppata per giorno con intestazione e totale: la usano sia la
+   lista del periodo sia i risultati della ricerca. */
+function gruppiPerGiorno(movimenti) {
   const gruppi = new Map();
   for (const m of movimenti) {
     const g = m.data || '';
@@ -791,15 +846,110 @@ function renderMovimenti() {
     gruppi.get(g).push(m);
   }
 
-  const giorni = Array.from(gruppi.keys()).sort().reverse();
-  for (const giorno of giorni) {
+  const nodi = [];
+  for (const giorno of Array.from(gruppi.keys()).sort().reverse()) {
     const lista = gruppi.get(giorno);
     const totale = lista.reduce((s, m) => s + (m.tipo === 'entrata' ? num(m.importo) : -num(m.importo)), 0);
-    box.append(el('div', { class: 'giorno-head' },
+    nodi.push(el('div', { class: 'giorno-head' },
       el('span', { class: 'giorno-data', text: giorno ? etichettaGiorno(giorno) : 'Senza data' }),
       el('span', { class: 'giorno-tot', text: eurSegnato(totale) })));
-    box.append(el('div', { class: 'mov-lista' }, lista.map(rigaMovimento)));
+    nodi.push(el('div', { class: 'mov-lista' }, lista.map(rigaMovimento)));
   }
+  return nodi;
+}
+
+/* ---------- ricerca su tutto lo storico ---------- */
+
+let ricTimer = 0;
+let ricCtrl = null;
+
+function annullaRicercaInVolo() {
+  clearTimeout(ricTimer);
+  if (ricCtrl) { ricCtrl.abort(); ricCtrl = null; }
+}
+
+/* Digitando: si attende, e una nuova ricerca annulla quella precedente. */
+function ricercaDigitata() {
+  const q = $('#ricercaQ').value.trim();
+  annullaRicercaInVolo();
+
+  if (q === '') {
+    stato.ric = { q: '', dati: null, stato: 'idle', errore: '' };
+    renderMovimenti();
+    if (stato.mov === null || stato.mScaduto) caricaMovimenti();
+    return;
+  }
+
+  stato.ric.q = q;
+  stato.ric.stato = 'loading';
+  stato.ric.errore = '';
+  renderMovimenti();
+  ricTimer = setTimeout(() => eseguiRicerca(q), RITARDO_RICERCA);
+}
+
+/* La ricerca ignora il periodo: nessun "da"/"a", è il suo scopo. */
+async function eseguiRicerca(q) {
+  annullaRicercaInVolo();
+  const ctrl = new AbortController();
+  ricCtrl = ctrl;
+
+  stato.ric.q = q;
+  stato.ric.stato = 'loading';
+  stato.ric.errore = '';
+  renderMovimenti();
+
+  let errore = null;
+  try {
+    const d = await api('cerca', { q }, ctrl.signal);
+    if (ricCtrl !== ctrl) return;
+    stato.ric.dati = d;
+    stato.ric.stato = 'ok';
+  } catch (err) {
+    if (err.annullata || ricCtrl !== ctrl) return;
+    errore = err;
+    stato.ric.dati = null;
+    stato.ric.stato = 'error';
+    stato.ric.errore = err.message;
+  }
+  if (ricCtrl !== ctrl) return;
+  ricCtrl = null;
+  renderMovimenti();
+  if (errore) gestisciAuth(errore);
+}
+
+function azzeraRicerca() {
+  annullaRicercaInVolo();
+  $('#ricercaQ').value = '';
+  stato.ric = { q: '', dati: null, stato: 'idle', errore: '' };
+}
+
+/* Riga di sintesi e ripartizione per categoria, sotto il campo. */
+function renderRiepilogoRicerca() {
+  const riga = $('#ricercaRiga');
+  const cat = $('#ricercaCat');
+  cat.replaceChildren();
+
+  const d = stato.ric.dati;
+  if (stato.ric.q === '' || stato.ric.stato !== 'ok' || !d) {
+    riga.hidden = true;
+    cat.hidden = true;
+    return;
+  }
+
+  const conteggio = Math.trunc(num(d.conteggio));
+  riga.replaceChildren(document.createTextNode(
+    `${conteggio} ${conteggio === 1 ? 'movimento' : 'movimenti'} · ${eur(d.totale)} in tutto lo storico`));
+  riga.hidden = false;
+
+  const perCat = Array.isArray(d.per_categoria) ? d.per_categoria.filter(c => c && c.nome) : [];
+  if (perCat.length < 2) { cat.hidden = true; return; }
+
+  for (const c of perCat.slice().sort((x, y) => num(y.totale) - num(x.totale))) {
+    cat.append(el('div', { class: 'ric-cat' },
+      el('span', { class: 'ric-cat-nome', text: c.nome }),
+      el('span', { class: 'ric-cat-tot', text: eur(c.totale) })));
+  }
+  cat.hidden = false;
 }
 
 function chip(testo, rimuovi) {
@@ -1125,6 +1275,31 @@ async function inviaInserisci(ev) {
   }
 }
 
+/* ============ modalità privacy ============ */
+
+function leggiPrivacy() {
+  try { stato.privacy = localStorage.getItem(CHIAVI.privacy) === '1'; } catch { stato.privacy = false; }
+}
+
+function aggiornaBottonePrivacy() {
+  const b = $('#btnPrivacy');
+  const etichetta = stato.privacy ? 'Mostra importi' : 'Nascondi importi';
+  b.setAttribute('aria-pressed', String(stato.privacy));
+  b.setAttribute('aria-label', etichetta);
+  b.title = etichetta;
+  $('.ico-occhio', b).hidden = stato.privacy;
+  $('.ico-occhio-off', b).hidden = !stato.privacy;
+}
+
+/* Nessuna chiamata all'API: i dati sono già in memoria, si ridisegna. */
+function cambiaPrivacy() {
+  stato.privacy = !stato.privacy;
+  try { localStorage.setItem(CHIAVI.privacy, stato.privacy ? '1' : '0'); } catch { /* non bloccante */ }
+  aggiornaBottonePrivacy();
+  renderRiepilogo();
+  renderMovimenti();
+}
+
 /* ============ toast ============ */
 
 let toastTimer = 0;
@@ -1156,7 +1331,11 @@ function collegaEventi() {
   $('#periodoSucc').addEventListener('click', () => spostaPeriodo(1));
   $('#periodoLabel').addEventListener('click', vaiAOggi);
   $('#btnAggiorna').addEventListener('click', aggiornaManuale);
+  $('#btnPrivacy').addEventListener('click', cambiaPrivacy);
   $('#btnImpostazioni').addEventListener('click', () => apriConfig());
+
+  $('#ricercaQ').addEventListener('input', ricercaDigitata);
+  $('#ricercaQ').addEventListener('search', ricercaDigitata);   // la "x" nativa del campo
 
   $('#tabs').addEventListener('click', ev => {
     const t = ev.target.closest('.tab');
@@ -1249,6 +1428,7 @@ function collegaEventi() {
     stato.config = null;
     stato.and = null;
     stato.mov = null; stato.mStato = 'idle'; stato.mScaduto = true;
+    azzeraRicerca();
     aggiornaFab();
     apriConfig('Configurazione cancellata.');
   });
@@ -1257,7 +1437,9 @@ function collegaEventi() {
 function avvia() {
   $('#versione').textContent = `Finanze ${VERSIONE}`;
   caricaStatoPeriodo();
+  leggiPrivacy();
   aggiornaBarra();
+  aggiornaBottonePrivacy();
   collegaEventi();
   aggiornaFab();
 

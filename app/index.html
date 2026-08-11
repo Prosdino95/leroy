@@ -35,6 +35,19 @@
           <button type="button" class="seg" data-tipo="anno">Anno</button>
         </div>
         <div class="barra-azioni">
+          <button type="button" class="icona-btn" id="btnPrivacy" aria-pressed="false"
+                  aria-label="Nascondi importi" title="Nascondi importi">
+            <svg class="ico-occhio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1.8 12S6 5.4 12 5.4 22.2 12 22.2 12S18 18.6 12 18.6 1.8 12 1.8 12z"/>
+              <circle cx="12" cy="12" r="3.1"/>
+            </svg>
+            <svg class="ico-occhio-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden>
+              <path d="M9.9 5.7A9.6 9.6 0 0 1 12 5.4c6 0 10.2 6.6 10.2 6.6a19 19 0 0 1-2.5 3.4"/>
+              <path d="M6.4 7.5A18.6 18.6 0 0 0 1.8 12S6 18.6 12 18.6c1.6 0 3-.4 4.2-1"/>
+              <path d="M9.9 9.9a3.1 3.1 0 0 0 4.3 4.3"/>
+              <path d="M3.5 3.5l17 17"/>
+            </svg>
+          </button>
           <button type="button" class="icona-btn" id="btnAggiorna" aria-label="Aggiorna" title="Aggiorna">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3.5 12a8.5 8.5 0 0 1 14.6-5.9"/><path d="M18.6 3v3.6H15"/>
@@ -71,7 +84,15 @@
   <main class="main">
     <div class="wrap">
       <section class="vista" id="vistaRiepilogo" aria-label="Riepilogo"></section>
-      <section class="vista" id="vistaMovimenti" aria-label="Movimenti" hidden></section>
+      <section class="vista" id="vistaMovimenti" aria-label="Movimenti" hidden>
+        <div class="ricerca">
+          <input id="ricercaQ" type="search" inputmode="search" autocomplete="off" spellcheck="false"
+                 enterkeyhint="search" placeholder="Cerca in tutto lo storico" aria-label="Cerca movimenti">
+          <p class="ricerca-riga" id="ricercaRiga" hidden></p>
+          <div class="ricerca-cat" id="ricercaCat" hidden></div>
+        </div>
+        <div id="listaMovimenti"></div>
+      </section>
     </div>
   </main>
 

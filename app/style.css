@@ -435,6 +435,49 @@ button { font: inherit; color: inherit; }
 
 /* ---------- movimenti ---------- */
 
+/* ricerca */
+.ricerca { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+input[type="search"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--bordo-2);
+  border-radius: var(--raggio);
+  background: var(--bg);
+  color: var(--testo);
+  font: inherit;
+  font-size: 1rem;
+  appearance: none;
+}
+input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
+@media (prefers-color-scheme: dark) {
+  /* la "x" nativa è scura: sul fondo scuro sarebbe invisibile */
+  input[type="search"]::-webkit-search-cancel-button { filter: invert(1) opacity(.75); }
+}
+.ricerca-riga {
+  font-size: .8125rem;
+  color: var(--testo-2);
+  font-variant-numeric: tabular-nums;
+}
+.ricerca-cat {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  overflow: hidden;
+}
+.ric-cat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: .875rem;
+}
+.ric-cat + .ric-cat { border-top: 1px solid var(--bordo); }
+.ric-cat-nome { color: var(--testo-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ric-cat-tot { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .chip {
   display: inline-flex;
