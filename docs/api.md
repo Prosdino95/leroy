@@ -10,9 +10,24 @@ x-push-token: <token>
 
 Il campo `azione` nel corpo seleziona l'operazione. Ogni risposta è JSON.
 
+| Azione | Cosa fa |
+|---|---|
+| `riepilogo` | totali del periodo, categorie, attese, configurazione |
+| `movimenti` | elenco delle transazioni di un periodo |
+| `cerca` | ricerca testuale su tutto lo storico |
+| `andamento` | serie mensile degli ultimi dodici mesi |
+| `inserisci` | registra un movimento |
+| `correggi` | modifica categoria e importo |
+| `elimina` | cancellazione logica |
+| `budget` | aggiorna i budget per categoria |
+
 L'aggregazione avviene lato server: la lettura del foglio è già il costo
 dominante di ogni chiamata, quindi restituire poche decine di numeri anziché
 migliaia di righe non costa nulla in più e alleggerisce molto il client.
+
+Le azioni che guardano indietro nel tempo — `cerca` e `andamento` — leggono
+anche il foglio `Archivio`. Senza, restituirebbero zero sui periodi vecchi
+senza segnalare nulla.
 
 ---
 
@@ -39,8 +54,6 @@ messaggio. Nessuna richiesta resta senza risposta.
 ---
 
 ## `riepilogo`
-
-Totali e ripartizione per categoria su un periodo.
 
 **Richiesta**
 
@@ -73,7 +86,7 @@ granularità:
   ],
   "attese": [
     { "hash": "9c1e40ab7d2f5583", "data": "2026-08-27", "importo": 36.55,
-      "etichetta": "octopus energy", "categoria": "Bollette" }
+      "etichetta": "octopus energy", "categoria": "Bollette", "tipo": "spesa" }
   ],
   "attese_totale": 36.55,
   "config": {
@@ -96,15 +109,14 @@ Note:
 - le righe in stato `eliminata` e `attesa` non vengono conteggiate nei totali
 - **`attese`** sono addebiti annunciati e non ancora avvenuti: non fanno parte
   di `uscite` né di `saldo`, e vanno mostrati a parte. `attese_totale` è la
-  loro somma
+  loro somma. Il campo `tipo` serve a popolare il selettore di categoria
+  quando si corregge un'attesa
 - a differenza di tutto il resto, **le attese non sono filtrate per periodo**:
   quello che sta per uscire interessa anche guardando un mese passato
 
 ---
 
 ## `movimenti`
-
-Elenco delle transazioni di un periodo.
 
 **Richiesta**
 
@@ -150,13 +162,91 @@ Note:
   che può essere lungo migliaia di caratteri, resta sul server
 - ordinamento per data decrescente
 - le righe `eliminata` e `attesa` non compaiono: le seconde si consultano dal
-  campo `attese` del riepilogo e si confermano dal bot Telegram
+  campo `attese` del riepilogo
+
+---
+
+## `cerca`
+
+**Richiesta**
+
+```json
+{
+  "azione": "cerca",
+  "q": "michele",
+  "da": null,
+  "a": null,
+  "categoria": null,
+  "tipo": null,
+  "min": null,
+  "max": null,
+  "limite": 100
+}
+```
+
+Tutti i campi tranne `azione` sono opzionali.
+
+**Risposta**
+
+```json
+{
+  "totale": 184.50,
+  "conteggio": 7,
+  "per_categoria": [ { "nome": "Ristorante", "totale": 184.50 } ],
+  "movimenti": [ ... ]
+}
+```
+
+I `movimenti` hanno la stessa forma dell'azione omonima.
+
+Note:
+
+- il testo viene confrontato in forma normalizzata — minuscolo, senza accenti —
+  contro esercente, descrizione, categoria e conto
+- con più parole, **tutte** devono comparire: cercando `bar michele` non
+  arrivano tutti i bar
+- `totale` e `per_categoria` considerano solo le uscite
+- **la PWA non invia `da` e `a`**: la ricerca guarda deliberatamente tutto lo
+  storico, ignorando il periodo selezionato. È il suo scopo, e l'interfaccia lo
+  dichiara nella riga di sintesi. I due campi restano disponibili per l'uso dal
+  bot Telegram, dove la domanda contiene spesso un riferimento temporale
+
+---
+
+## `andamento`
+
+**Richiesta**
+
+```json
+{ "azione": "andamento", "categoria": null }
+```
+
+`categoria` opzionale: se valorizzata, la serie riguarda solo quella.
+
+**Risposta**
+
+```json
+{
+  "mesi": [
+    { "mese": "2025-08", "uscite": 2210.40, "entrate": 2400.00 },
+    { "mese": "2026-08", "uscite": 847.20,  "entrate": 2400.00 }
+  ],
+  "media_uscite": 2150.30,
+  "categoria": null
+}
+```
+
+Note:
+
+- tredici elementi in ordine cronologico: dodici mesi conclusi più quello in
+  corso, che è **parziale**
+- `media_uscite` è calcolata sui soli mesi conclusi: includere quello in corso
+  abbasserebbe il riferimento proprio quando serve confrontarcisi
+- la serie non dipende dal periodo selezionato
 
 ---
 
 ## `inserisci`
-
-Registra un movimento inserito a mano.
 
 **Richiesta**
 
@@ -179,11 +269,11 @@ Opzionali: `esercente`, `data` (default oggi), `note`.
 **Risposta**
 
 ```json
-{ "ok": true, "hash": "a3f2c81b4d5e6f70", "duplicato_sospetto": false }
+{ "ok": true, "hash": "a3f2...", "duplicato_sospetto": false }
 ```
 
-`duplicato_sospetto` a `true` significa che esiste un movimento simile
-registrato di recente da un altro canale. **L'inserimento è comunque
+`duplicato_sospetto` a `true` significa che esiste una transazione simile
+registrata di recente da un altro canale. **L'inserimento è comunque
 avvenuto**: qui la decisione è dell'utente, quindi il sistema segnala e non
 scarta. È la differenza rispetto alla raccolta automatica, dove un doppione fra
 due canali viene invece eliminato.
@@ -191,8 +281,6 @@ due canali viene invece eliminato.
 ---
 
 ## `correggi`
-
-Modifica categoria e importo di un movimento esistente.
 
 **Richiesta**
 
@@ -210,6 +298,11 @@ Modifica categoria e importo di un movimento esistente.
 cambiato: un aggiornamento con un campo vuoto cancellerebbe il valore esistente
 sul foglio.
 
+**Attenzione a `stato` quando si corregge un'attesa**: va rimandato `attesa`,
+non `confermata`. Passando `confermata` si dichiarerebbe avvenuto un addebito
+soltanto previsto: la riga entrerebbe nei totali del mese prima che i soldi
+siano usciti, e non verrebbe più riconciliata all'arrivo dell'addebito vero.
+
 Non è possibile modificare data, tipo o conto: per quelli si interviene
 direttamente sul foglio.
 
@@ -222,8 +315,6 @@ direttamente sul foglio.
 ---
 
 ## `elimina`
-
-Rimuove un movimento dalle viste.
 
 **Richiesta**
 
@@ -238,13 +329,32 @@ Rimuove un movimento dalle viste.
 ```
 
 È una **cancellazione logica**: la riga resta nel foglio con stato
-`eliminata` e viene esclusa da riepiloghi, elenchi e controllo duplicati. Dal
-punto di vista dell'app il movimento è sparito, ma resta recuperabile
-intervenendo sul foglio.
+`eliminata` e viene esclusa da riepiloghi, elenchi, ricerche, andamento e
+controllo duplicati. Dal punto di vista dell'app il movimento è sparito, ma
+resta recuperabile intervenendo sul foglio.
 
 La scelta evita di lavorare sugli indici di riga, che cambiano a ogni
 ordinamento, ed è coerente col principio per cui nulla viene distrutto in
 silenzio.
+
+---
+
+## `budget`
+
+**Richiesta**
+
+```json
+{ "azione": "budget", "valori": { "Supermercato": 161, "Ristorante": 134 } }
+```
+
+Invia solo le categorie effettivamente modificate. I nomi che non esistono nel
+foglio `Categorie` vengono ignorati.
+
+**Risposta**
+
+```json
+{ "ok": true, "aggiornate": 2 }
+```
 
 ---
 
@@ -257,6 +367,8 @@ H=(-H "x-push-token: $TOK" -H 'Content-Type: application/json')
 
 curl -s -X POST "$API" "${H[@]}" -d '{"azione":"riepilogo","periodo":"2026-08"}'
 curl -s -X POST "$API" "${H[@]}" -d '{"azione":"movimenti","periodo":"2026-08"}'
+curl -s -X POST "$API" "${H[@]}" -d '{"azione":"cerca","q":"coop"}'
+curl -s -X POST "$API" "${H[@]}" -d '{"azione":"andamento"}'
 curl -s -X POST "$API" "${H[@]}" -d '{"azione":"boh"}'
 ```
 

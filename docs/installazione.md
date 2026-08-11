@@ -144,11 +144,16 @@ vedi `localhost`, la variabile `WEBHOOK_URL` non è stata letta.
 
 ## 5. Il foglio dati
 
-Crea un Google Sheet con cinque fogli: `Transazioni`, `Categorie`, `Regole`,
-`Conti`, `Log`. Colonne e semantica sono in [`schema-dati.md`](schema-dati.md).
+Crea un Google Sheet con sette fogli: `Transazioni`, `Archivio`, `Categorie`,
+`Regole`, `Ricorrenti`, `Conti`, `Log`. Colonne e semantica sono in
+[`schema-dati.md`](schema-dati.md).
 
-Formatta la colonna `importo` come **Testo normale**, altrimenti il locale
-italiano interpreterà valori come `6.00` come orari.
+`Archivio` ha la stessa struttura di `Transazioni` e all'inizio resta vuoto:
+ci si spostano gli anni chiusi quando le letture cominciano a farsi lente.
+
+Formatta la colonna `importo` come **Testo normale** in entrambi i fogli dei
+movimenti, altrimenti il locale italiano interpreterà valori come `6.00` come
+orari.
 
 ---
 
@@ -212,6 +217,10 @@ originale.
 
 **Attiva prima il workflow di elaborazione, poi gli ingestori**: un richiamo
 verso un workflow inattivo fallisce.
+
+Poi, nelle impostazioni di **ogni** workflow, imposta `guardiano` come *Error
+Workflow* — tranne che nel guardiano stesso. È il passaggio più noioso e il più
+facile da dimenticare: se ne salti uno, i suoi errori restano invisibili.
 
 ---
 
@@ -307,6 +316,9 @@ Nell'ordine, ognuna verifica un pezzo diverso:
 4. apri la PWA e controlla che i tre movimenti ci siano tutti
 5. inserisci una spesa dall'app e verifica che compaia nel foglio con la fonte
    corretta
+6. fai fallire di proposito un workflow da un trigger vero — non
+   dall'esecuzione manuale, che n8n non considera — e controlla che arrivi
+   l'avviso del guardiano
 
 Se il punto 3 e il punto 1 producessero due righe per la stessa spesa, la
 deduplica non sta lavorando: controlla il foglio `Log`, dove sono registrati

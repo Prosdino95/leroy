@@ -1,9 +1,18 @@
 # Schema dei dati
 
-Tutti i dati vivono in un unico Google Sheet, con cinque fogli. Le colonne
-sono identificate **per nome**, non per posizione: i nodi n8n leggono
-l'intestazione di riga 1. Rinominare una colonna rompe i workflow; spostarla
-no.
+Tutti i dati vivono in un unico Google Sheet, con sette fogli. Le colonne sono
+identificate **per nome**, non per posizione: i nodi n8n leggono l'intestazione
+di riga 1. Rinominare una colonna rompe i workflow; spostarla no.
+
+| Foglio | Contenuto | Scritto da |
+|---|---|---|
+| `Transazioni` | movimenti del periodo corrente | workflow e app |
+| `Archivio` | anni chiusi, stessa struttura | a mano |
+| `Categorie` | elenco chiuso delle categorie e budget | migrazione e app |
+| `Regole` | memoria della categorizzazione | conferme Telegram |
+| `Ricorrenti` | abbonamenti dedotti dallo storico | workflow ricorrenti |
+| `Conti` | elenco degli strumenti di pagamento | a mano |
+| `Log` | scarti e anomalie | workflow |
 
 ---
 
@@ -60,6 +69,11 @@ sola avrebbe prodotto qualcosa di generico. Per questo il nodo che chiude
 un'attesa aggiorna solo data, importo, conto, fonte e stato — un campo mappato
 a vuoto cancellerebbe il resto.
 
+Una riga diventa `attesa` solo se il testo contiene una data futura. Se il
+modello linguistico la dichiara tale ma quella data non c'è, viene trattata
+come un addebito già avvenuto: la classificazione va verificata contro un dato
+oggettivo, non accettata sulla parola.
+
 ### Note importanti
 
 **`hash_dedup` è la chiave usata da tutto il sistema**, non `id`. I bottoni di
@@ -81,6 +95,27 @@ formule del foglio.
 **`esercente` e `note` sono cose diverse.** Il primo è il luogo — `coop
 centro`, `da michele` — il secondo cosa hai comprato. Scrivendo dal bot, la
 chiocciola separa i due: `12 pizza @da michele`.
+
+---
+
+## `Archivio`
+
+**Struttura identica a `Transazioni`.** Ci si spostano a mano gli anni chiusi,
+per alleggerire le letture correnti: ogni chiamata all'API rilegge l'intero
+foglio, e oltre qualche migliaio di righe la cosa si sente.
+
+Chi legge cosa:
+
+| Legge solo `Transazioni` | Legge anche `Archivio` |
+|---|---|
+| riepilogo, movimenti | ricerca, andamento |
+| inserimento, correzione, eliminazione | report periodici, ricorrenti |
+| deduplica e riconciliazione | |
+
+La regola è semplice: chi guarda il presente resta su `Transazioni`, chi
+guarda indietro nel tempo legge entrambi. **Aggiungendo un workflow che fa
+confronti storici, ricordati del secondo foglio**: senza, restituisce zero sui
+periodi vecchi senza segnalare nulla.
 
 ---
 
@@ -138,6 +173,34 @@ fatto la categorizzazione automatica.
 
 ---
 
+## `Ricorrenti`
+
+Gli abbonamenti, dedotti dallo storico e riscritti ogni giorno.
+
+| Colonna | Contenuto |
+|---|---|
+| `esercente` | chiave di raggruppamento, normalizzata |
+| `categoria` | quella dell'ultima occorrenza |
+| `cadenza` | `settimanale`, `mensile`, `bimestrale`, `trimestrale`, `semestrale`, `annuale` |
+| `giorni` | intervallo tipico in giorni |
+| `importo_tipico` | mediana degli importi |
+| `occorrenze` | quante volte è comparso |
+| `ultima_data` | ultima occorrenza registrata |
+| `prossima_attesa` | quando dovrebbe ripresentarsi |
+| `ignora` | `si` per escluderlo dagli avvisi |
+| `aggiornata_il` | ultimo ricalcolo |
+
+Una ricorrenza si riconosce da almeno tre occorrenze a intervalli regolari,
+valutati sulla **mediana** e non sulla media: un pagamento in ritardo isolato
+non deve cancellare un pattern.
+
+**`ignora` è la sola colonna tua.** Il workflow la legge ma non la scrive mai,
+quindi resta com'è a ogni ricalcolo. Serve per gli esercenti che frequenti con
+regolarità senza che siano abbonamenti — il supermercato del sabato è
+regolarissimo, ma non è qualcosa da sorvegliare.
+
+---
+
 ## `Conti`
 
 | Colonna | Contenuto |
@@ -173,15 +236,14 @@ purché resti traccia di cosa e perché.
 ## Manutenzione
 
 **Formattazione.** La colonna `importo` va impostata su *Testo normale*
-(Formato → Numero → Testo normale). Conviene fare lo stesso su `hash_dedup`,
-che può capitare sia composto di sole cifre e verrebbe convertito in notazione
-scientifica.
+(Formato → Numero → Testo normale), sia in `Transazioni` sia in `Archivio`.
+Conviene fare lo stesso su `hash_dedup`, che può capitare sia composto di sole
+cifre e verrebbe convertito in notazione scientifica.
 
 **Convalida.** Sulla colonna `categoria` si può impostare una convalida dati
 con elenco da intervallo puntato al foglio `Categorie`: protegge dagli errori
 di battitura nelle correzioni manuali.
 
-**Crescita.** Oltre qualche migliaio di righe la lettura inizia a farsi
-sentire, perché ogni chiamata rilegge l'intero foglio. La contromisura è
-spostare gli anni chiusi in un foglio `Archivio`: le letture correnti si
-alleggeriscono e lo storico resta consultabile quando serve.
+**Archiviazione.** A inizio anno, sposta le righe dell'anno chiuso da
+`Transazioni` ad `Archivio`. Le letture correnti si alleggeriscono e nulla si
+perde: i confronti storici leggono entrambi i fogli.
