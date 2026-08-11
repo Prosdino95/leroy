@@ -1,0 +1,30 @@
+name: Deploy APP to VM
+
+# L'azione si attiva solo in caso di "push"
+on:
+  push:
+    branches:
+      - main  # Cambialo se il tuo branch principale si chiama 'master' o in un altro modo
+    paths:
+      - 'app/**' # Si attiva SOLO se ci sono modifiche dentro la cartella APP
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Scarica il codice della repository nella macchina virtuale di GitHub
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      # Step 2: Esegue la copia tramite SCP
+      - name: Copia i file sulla VM remota tramite SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: 22
+          source: "app"
+          target: "/home/ubuntu/stack/app" # Lo forziamo ad andare esattamente qui
+          strip_components: 1
