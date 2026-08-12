@@ -1,0 +1,166 @@
+{
+  "name": "Leroy android",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "PATH",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -416,
+        0
+      ],
+      "id": "790b7052-1418-4329-9c47-9472c7c66bc4",
+      "name": "Webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CRED_HEADER_AUTH_ANDROID",
+          "name": "Android"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const SEP = '|#|';   // deve coincidere con quello nel corpo di MacroDroid\n\nconst raw = $json.body ?? $json.rawBody ?? $json;\n\nlet campi;\nif (typeof raw === 'string') {\n  campi = raw.split(SEP);\n} else if (raw && typeof raw === 'object') {\n  campi = [raw.titolo, raw.testo, raw.pacchetto, raw.ts];\n} else {\n  return [];\n}\n\n// I default valgono anche se il messaggio arriva con meno campi del previsto.\nconst [titolo = '', corpo = '', pkgRaw = '', tsRaw = ''] =\n  campi.map(v => String(v ?? '').trim());\n\nconst pkg = pkgRaw.toLowerCase();\nconst testo = [titolo, corpo].filter(Boolean).join(' — ');\n\n// Prova di MacroDroid: i segnaposto non sono stati sostituiti.\nif (/\\{[a-z_]+\\}/i.test(testo)) {\n  return [{ json: { PROVA: true, ricevuto: testo } }];\n}\n\nconst RE_IMPORTO = /(?:€|\\beuro?\\b)\\s*\\d[\\d.,]*|\\d[\\d.,]*\\s*(?:€|\\beuro?\\b)/i;\nif (!RE_IMPORTO.test(testo)) return [];\n\nconst impronta = (testo + '|' + pkg).replace(/\\s+/g, '').slice(0, 120);\n\nlet ts = Number(tsRaw);\nif (!ts || isNaN(ts)) ts = Date.now();\nif (ts < 1e12) ts = ts * 1000;\n\nreturn [{ json: {\n  fonte: 'push',\n  id_esterno: 'push_' + impronta,\n  mittente: pkg || 'push',\n  oggetto: titolo,\n  testo,\n  data: new Date(ts).toISOString(),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "d099a80c-30dd-41b1-b148-91d998187b37",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "WF_PROCESSA_DATI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/WF_PROCESSA_DATI",
+          "cachedResultName": "Leroy Processa Dati"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "id_esterno",
+              "displayName": "id_esterno",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mittente",
+              "displayName": "mittente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "oggetto",
+              "displayName": "oggetto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "testo",
+              "displayName": "testo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "e18b0214-3f21-488f-b678-3d3512202616",
+      "name": "Processa dati"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Processa dati",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "WF_GUARDIANO",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "96de16f6-f278-46a0-80aa-c897105db3f5",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "WF_ANDROID",
+  "tags": []
+}

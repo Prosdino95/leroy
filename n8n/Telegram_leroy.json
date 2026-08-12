@@ -1,0 +1,2080 @@
+{
+  "name": "Telegram_leroy",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -800,
+        -48
+      ],
+      "id": "577a6ed1-6153-456b-9851-408ae86aaacb",
+      "name": "Telegram Trigger",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const CONTI = ['banca', 'contante', 'paypal', 'satispay', 'revolut'];\nconst CONTO_DEFAULT = 'banca';\nconst RE_DOMANDA = /^\\s*(quant|quand|dove|cosa|che\\s|mostra|elenca|cerca|trova|riepilog)/i;\n\n\n\nfunction normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nconst msg = $input.first().json.message;\nconst testo = msg.text || msg.caption || '';\n\nconst iniziaConNumero = /^\\s*[+-]?\\s*\\d/.test(testo);\nconst eDomanda = !iniziaConNumero &&\n                 (RE_DOMANDA.test(testo) || /\\?\\s*$/.test(testo.trim()));\n\nif (eDomanda) {\n  return [{ json: {\n    eDomanda,\n    chat_id: msg.chat.id,\n    message_id: msg.message_id,\n    testo,\n  }}];\n}\n\n// Se c'e' un numero con i decimali quello e' quasi sempre l'importo\n// (\"cena 4 amici 30,50\"); altrimenti prendo il primo numero.\nconst m = testo.match(/([+-]?)\\s*(\\d+[.,]\\d{1,2})\\b/) ||\n          testo.match(/([+-]?)\\s*(\\d+)\\b/);\n\nif (!m) {\n  return [{ json: {\n    text: 'Non ho capito. Prova tipo: 12,50 pizza  oppure  +2400 stipendio oppure una domanda sulle tue spese.',\n    parse_mode: 'HTML',\n    disable_web_page_preview: true,\n}}];\n}\n\nconst importo = parseFloat(m[2].replace(',', '.'));\nconst tipo = m[1] === '+' ? 'entrata' : 'spesa';\n\nlet resto = testo.replace(m[0], ' ').trim();\nlet conto = CONTO_DEFAULT;\nfor (const c of CONTI) {\n  const re = new RegExp('\\\\b' + c + '\\\\b', 'i');\n  if (re.test(resto)) { conto = c; resto = resto.replace(re, '').trim(); }\n}\n\n// \"@\" marca l'esercente: \"20 pizza @da michele\" -> pizza / da michele.\n// Senza chiocciola resta tutto descrizione, che e' il caso normale.\nlet esercente = '';\nlet descrizione = resto;\nconst at = resto.match(/@\\s*(.+)$/);\nif (at) {\n  esercente = normalizza(at[1]);\n  descrizione = resto.slice(0, at.index).trim();\n}\n\n\nreturn [{ json: {\n  modo: 'movimento',\n  valido: true,\n  chat_id: msg.chat.id,\n  message_id: msg.message_id,\n  testo_grezzo: testo,\n  importo,\n  tipo,\n  conto,\n  esercente,\n  descrizione: normalizza(descrizione),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        96
+      ],
+      "id": "9b863ec0-039c-4014-a972-7b144281d079",
+      "name": "Estrai transazione"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dcd93b46-d359-4ed2-8127-c601378406c3",
+              "leftValue": "={{ $json.callback_query }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -352,
+        -144
+      ],
+      "id": "dbab53ec-3e3c-4a00-a02a-6169f0341d70",
+      "name": "è una conferma?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "15853aa6-c966-48cd-961b-44bdb4956634",
+              "leftValue": "={{ $json.categoria }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1216,
+        192
+      ],
+      "id": "d9562a6d-9d87-4cf7-bf97-ba87a8109767",
+      "name": "Serve AI?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tx = $('Decidi categoria').first().json;\n\n// Hash a 64 bit (FNV-1a). Non e' crittografia: serve solo come chiave\n// di identita' per la deduplica, e il Code node di n8n non espone crypto.\nfunction hash64(str) {\n  let h = 0xcbf29ce484222325n;\n  const p = 0x100000001b3n;\n  for (let i = 0; i < str.length; i++) {\n    h ^= BigInt(str.charCodeAt(i));\n    h = (h * p) & 0xffffffffffffffffn;\n  }\n  return h.toString(16).padStart(16, '0');\n}\n\nfunction uuid() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n  });\n}\n\nlet categoria = tx.categoria;\nlet confidenza = tx.confidenza ?? 0.2;\n\nif (!tx.categoria) {\n  try {\n    const risposta = $('Gemini').first().json;\n    const testo = risposta.candidates[0].content.parts[0].text\n      .replace(/```json|```/g, '').trim();\n    const parsed = JSON.parse(testo);\n    if (tx.categorie_disponibili.includes(parsed.categoria)) {\n      categoria = parsed.categoria;\n      confidenza = Number(parsed.confidenza) || 0.5;\n    }\n  } catch (e) {\n    // Gemini muto o risposta illeggibile: ripiego e chiedo conferma.\n  }\n  if (!categoria) { categoria = tx.categorie_disponibili[0]; confidenza = 0.2; }\n}\n\nconst oggi = new Date().toISOString().slice(0, 10);\nconst daVerificare = confidenza < 0.75;\n\n// Cosa mostrare nella risposta: il posto se lo conosci, altrimenti cosa hai preso.\nconst etichetta = tx.esercente || tx.descrizione;\n\n// Il message_id di Telegram rende l'hash unico per messaggio: se Telegram\n// ritrasmette lo stesso update, l'hash coincide e il doppione e' visibile.\nconst hash = hash64([oggi, tx.importo.toFixed(2), etichetta,\n                     tx.conto, tx.message_id].join('|'));\n\nconst id = uuid();\nconst segno = tx.tipo === 'entrata' ? '+' : '−';\n\nconst risposta_testo = segno + ' ' +\n  tx.importo.toFixed(2).replace('.', ',') + ' €  ' + categoria +\n  (etichetta ? '<br>' + etichetta : '') + '<br>' + tx.conto +\n  (daVerificare ? '<br><br>Categoria incerta, confermi?' : '');\n\n// Bottoni solo se la confidenza e' bassa.\n// Nella callback viaggiano l'hash (chiave di riga) e il NOME della categoria:\n// cosi' al ritorno non serve ricostruire nessuna lista. Telegram limita\n// callback_data a 64 byte, da cui il filtro sui nomi lunghi.\nlet tastiera = null;\nif (daVerificare) {\n  const cats = tx.categorie_disponibili.filter(c => c.length <= 40);\n  const righe = [];\n  for (let i = 0; i < cats.length; i += 2) {\n    righe.push(cats.slice(i, i + 2).map(c => ({\n      text: c,\n      callback_data: 'c|' + hash + '|' + c,\n    })));\n  }\n  righe.push([{ text: 'Va bene cosi', callback_data: 'ok|' + hash + '|' + categoria }]);\n  tastiera = { inline_keyboard: righe };\n}\n\n// Il payload per Telegram si costruisce qui, dove i dati ci sono gia'.\n// reply_markup viene aggiunto solo se serve: passarlo a null fa storcere\n// il naso all'API.\nconst payload = { chat_id: tx.chat_id, text: risposta_testo };\nif (tastiera) payload.reply_markup = tastiera;\n\n// Gia' serializzato: nel nodo HTTP basta referenziarlo, niente\n// JSON.stringify dentro l'espressione.\nconst payload_json = JSON.stringify(payload);\n\nreturn [{ json: {\n  riga: {\n    id,\n    data_evento: oggi,\n    data_inserimento: new Date().toISOString(),\n    fonte: 'telegram',\n    tipo: tx.tipo,\n    importo: tx.importo.toFixed(2),\n    valuta: 'EUR',\n    conto: tx.conto,\n    esercente: tx.esercente,\n    categoria,\n    sottocategoria: '',\n    note: tx.descrizione,\n    testo_grezzo: tx.testo_grezzo,\n    hash_dedup: hash,\n    confidenza: confidenza.toFixed(2),\n    stato: daVerificare ? 'da_verificare' : 'confermata',\n  },\n  payload,\n  payload_json,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        192
+      ],
+      "id": "421171fc-89ca-47a5-9f28-29747f1c7d2b",
+      "name": "Componi riga"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cb = $input.first().json.callback_query;\n\n// callback_data = \"<azione>|<hash>|<categoria>\"\n// La categoria viaggia gia' risolta: niente indici da reinterpretare.\nconst parti = String(cb.data).split('|');\n\nreturn [{ json: {\n  azione: parti[0],\n  chiave: parti[1],\n  categoria: parti.slice(2).join('|'),\n  chat_id: cb.message.chat.id,\n  message_id: cb.message.message_id,\n  callback_id: cb.id,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        -480
+      ],
+      "id": "c881a833-551b-4b0b-827c-1e5458099a25",
+      "name": "Leggi conferma"
+    },
+    {
+      "parameters": {
+        "jsCode": "function normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nconst tx = $('Estrai transazione').first().json;\n\nconst regole = $('Leggi Regole').all()\n  .map(i => i.json)\n  .filter(r => normalizza(String(r.pattern || '')).length >= 2);\n\nconst categorie = $('Leggi Categorie').all()\n  .map(i => i.json)\n  .filter(c => c.categoria && String(c.tipo).toLowerCase() === tx.tipo)\n  .map(c => String(c.categoria));\n\n// 1) Regole locali: gratis e istantanee.\n// Il match avviene su esercente + descrizione insieme, cosi' funziona sia\n// con \"@coop\" sia con \"spesa settimanale\".\nconst testoMatch = normalizza((tx.esercente || '') + ' ' + (tx.descrizione || ''));\nconst regola = regole.find(r => testoMatch &&\n  testoMatch.includes(normalizza(r.pattern)));\n\nif (regola) {\n  return [{ json: {\n    ...tx,\n    categoria: String(regola.categoria),\n    confidenza: 1,\n    serve_ai: false,\n    categorie_disponibili: categorie,\n  }}];\n}\n\n// 2) Niente regola: prepariamo il prompt per Gemini.\nconst prompt = 'Classifica questa transazione in UNA delle categorie elencate.\\n\\n' +\n  'Categorie ammesse:\\n' + categorie.join('\\n') + '\\n\\n' +\n  'Descrizione: \"' + [tx.esercente, tx.descrizione].filter(Boolean).join(' ') +\n  '\"\\n\\n' +\n  'Rispondi solo con JSON: {\"categoria\": \"<una delle categorie>\", \"confidenza\": <0.0-1.0>}\\n' +\n  'La confidenza sia bassa se la descrizione e ambigua.';\n\nconst body = {\n  contents: [{ parts: [{ text: prompt }] }],\n  generationConfig: { responseMimeType: 'application/json' },\n};\nreturn [{ json: {\n  ...tx,\n  categoria: '',\n  prompt,\n  serve_ai: true,\n  body_json: JSON.stringify(body),\n  categorie_disponibili: categorie,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        192
+      ],
+      "id": "b187a412-4806-4718-b8e9-d6e7a62bf0af",
+      "name": "Decidi categoria"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f0ed9748-1003-4d23-afed-f5bfdde30c39",
+              "leftValue": "={{ ($json.message || $json.callback_query).from.id }}",
+              "rightValue": 369010791,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -576,
+        -48
+      ],
+      "id": "9278448c-0e7c-4b71-9334-495b00c43d4c",
+      "name": "sono io?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body_json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        128
+      ],
+      "id": "012f8125-112d-42f8-b525-9b4574b4efd9",
+      "name": "Gemini",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CRED_GEMINI",
+          "name": "Gemini"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "087a358e-9c3b-457c-b171-359132e6010c",
+              "leftValue": "={{ $('Trova transazione').first().json.esercente || $('Trova transazione').first().json.note }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        768,
+        -384
+      ],
+      "id": "a7a0eadf-ccb7-400c-a5d4-b031aab487f8",
+      "name": "apprendimento?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a119e2ba-239c-446b-90e4-e6a2e8d68ebe",
+              "leftValue": "={{ $json.azione }}",
+              "rightValue": "att",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        96,
+        -480
+      ],
+      "id": "83d3d670-5f1d-4a7d-bfa7-054f2c7113b6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const c = $('Leggi conferma').first().json;\n// callback_data = \"att|<hash>|reg\" oppure \"att|<hash>|ann\"\nreturn [{ json: {\n  hash: c.chiave,\n  stato: c.categoria === 'reg' ? 'confermata' : 'eliminata',\n  testo: c.categoria === 'reg' ? 'Registrata' : 'Annullata',\n  callback_id: c.callback_id,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -576
+      ],
+      "id": "6475b1e8-2b78-4b64-adfc-1adc9facf409",
+      "name": "Conferma"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c8ee802c-7ec3-48c1-a9ce-737bb7df8623",
+              "leftValue": "={{ $json.eDomanda }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        96,
+        96
+      ],
+      "id": "10f8e585-dd60-436d-ac8c-30335fbc358f",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Prepara domanda').first().json;\nconst risposta = $('Gemini domanda').first().json;\n\nconst parts = risposta?.candidates?.[0]?.content?.parts || [];\nconst grezzo = parts.map(p => p.text).filter(Boolean).join('')\n  .replace(/```json|```/g, '').trim();\n\nlet f = null;\ntry { f = JSON.parse(grezzo); } catch { f = null; }\n\nconst fallito = (msg) => [{ json: { chat_id: prep.chat_id, errore: msg } }];\n\nif (!f) return fallito('Non sono riuscito a interpretare la domanda. Riprova.');\nif (f.capita === false) {\n  return fallito('Rispondo solo a domande su spese e movimenti. Prova con ' +\n                 '\"quanto ho speso in ristoranti a luglio\".');\n}\n\n// --- validazione di ogni campo ---\nconst ISO = /^\\d{4}-\\d{2}-\\d{2}$/;\nconst numOrNull = (v) =>\n  (v === null || v === undefined || v === '') ? null\n  : (Number.isFinite(Number(v)) ? Number(v) : null);\n\n// La categoria deve esistere davvero: il confronto è insensibile alle\n// maiuscole e riconduce al nome esatto del foglio.\nconst cat = prep.categorie.find(c =>\n  c.toLowerCase() === String(f.categoria || '').toLowerCase()) || null;\n\nlet da = ISO.test(String(f.da)) ? String(f.da) : null;\nlet a  = ISO.test(String(f.a))  ? String(f.a)  : null;\nif (da && a && da > a) { const t = da; da = a; a = t; }   // intervallo invertito\n\nconst filtro = {\n  azione: 'cerca',\n  q: f.q ? String(f.q).slice(0, 60) : null,\n  da, a,\n  categoria: cat,\n  tipo: ['spesa', 'entrata'].includes(f.tipo) ? f.tipo : null,\n  min: numOrNull(f.min),\n  max: numOrNull(f.max),\n  limite: 200,\n};\n\n// Un filtro completamente vuoto restituirebbe tutto lo storico: quasi sempre\n// significa che la domanda non è stata capita.\nconst vuoto = !filtro.q && !filtro.da && !filtro.a && !filtro.categoria &&\n              !filtro.tipo && filtro.min === null && filtro.max === null;\nif (vuoto) return fallito('Non ho capito su cosa cercare. Prova a indicare un ' +\n                          'periodo, una categoria o un nome.');\n\nconst agg = ['totale', 'elenco', 'per_categoria'].includes(f.aggregazione)\n  ? f.aggregazione : 'totale';\n\nreturn [{ json: {\n  chat_id: prep.chat_id,\n  aggregazione: agg,\n  filtro,\n  filtro_json: JSON.stringify(filtro),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -144
+      ],
+      "id": "b9156367-1af4-46b5-a498-d41d0d86103b",
+      "name": "Leggi filtro"
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $('Estrai transazione').first().json;\n\nconst categorie = $('Leggi Categorie1').all().map(i => i.json)\n  .filter(c => c.categoria).map(c => String(c.categoria));\n\n// Il modello deve sapere che giorno è, altrimenti \"a luglio\" non ha senso.\nconst oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });\n\nconst prompt =\n  'Traduci la domanda in un filtro di ricerca. Oggi è ' + oggi + '.\\n\\n' +\n  'Categorie esistenti:\\n' + categorie.join('\\n') + '\\n\\n' +\n  'Domanda: \"' + q.testo + '\"\\n\\n' +\n  'Rispondi solo con JSON:\\n' +\n  '{\"capita\": true|false, \"q\": \"<parole chiave>\"|null,\\n' +\n  ' \"da\": \"YYYY-MM-DD\"|null, \"a\": \"YYYY-MM-DD\"|null,\\n' +\n  ' \"categoria\": \"<una delle categorie>\"|null,\\n' +\n  ' \"tipo\": \"spesa\"|\"entrata\"|null,\\n' +\n  ' \"min\": <numero>|null, \"max\": <numero>|null,\\n' +\n  ' \"aggregazione\": \"totale\"|\"elenco\"|\"per_categoria\"}\\n\\n' +\n  'Regole:\\n' +\n  '- Interpreta il tempo rispetto a oggi. \"luglio\" senza anno è il luglio più ' +\n  'recente già iniziato. \"questo mese\" è il mese di oggi. \"ultimi tre mesi\" ' +\n  'parte da tre mesi fa e arriva a oggi. \"l anno scorso\" è l anno solare ' +\n  'precedente per intero.\\n' +\n  '- Se non c è alcun riferimento temporale, lascia da e a a null: la ricerca ' +\n  'coprirà tutto lo storico.\\n' +\n  '- aggregazione: \"quanto ho speso\" -> totale. \"cosa\", \"quali\", \"mostrami\", ' +\n  '\"elenca\" -> elenco. \"come ho speso\", \"in cosa\", \"per categoria\" -> ' +\n  'per_categoria.\\n' +\n  '- categoria SOLO se coincide con una dell elenco. Altrimenti null, e le ' +\n  'parole rilevanti finiscono in q.\\n' +\n  '- q contiene il nome di un esercente o di un luogo, mai parole generiche ' +\n  'come \"speso\", \"soldi\", \"spese\". Se non ce n è, null.\\n' +\n  '- capita false se la domanda non riguarda movimenti, spese o entrate.';\n\nreturn [{ json: {\n  chat_id: q.chat_id,\n  testo: q.testo,\n  categorie,\n  body_json: JSON.stringify({\n    contents: [{ parts: [{ text: prompt }] }],\n    generationConfig: { responseMimeType: 'application/json' },\n  }),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -144
+      ],
+      "id": "36c025eb-6335-4fd4-b1cd-12dfa59b51ca",
+      "name": "Prepara domanda"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0d23abe0-fcde-48b5-966d-b392a94c5227",
+              "leftValue": "={{ $json.filtro_json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1216,
+        -144
+      ],
+      "id": "68763f0c-febf-4188-9555-0f5d1d54441a",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const f = $('Leggi filtro').first().json;\nconst r = $('Chiama ricerca').first().json || {};\n\nconst eur = (n) => (Math.round(Number(n) * 100) / 100).toFixed(2)\n  .replace('.', ',') + ' €';\nconst esc = (s) => String(s)\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst gg = (d) => String(d).slice(8) + '/' + String(d).slice(5, 7);\n\nif (r.ok === false || r.error || !Number.isFinite(Number(r.conteggio))) {\n  return [{ json: {\n      text: 'La ricerca non è riuscita. Riprova fra poco.',\n  }}];\n}\n\nlet t;\n\nif (!r.conteggio) {\n  t = 'Nessun movimento trovato.';\n} else if (f.aggregazione === 'elenco') {\n  const righe = (r.movimenti || []).slice(0, 15).map(m =>\n    gg(m.data) + '  ' + eur(m.importo) + '  ' + esc(m.etichetta || m.categoria));\n  t = '<b>' + r.conteggio + ' movimenti · ' + eur(r.totale) + '</b><br><br>' +\n      righe.join('<br>');\n  if (r.conteggio > 15) t += '<br>…e altri ' + (r.conteggio - 15);\n} else if (f.aggregazione === 'per_categoria') {\n  const righe = (r.per_categoria || []).slice(0, 12).map(c =>\n    esc(c.nome) + ': ' + eur(c.totale));\n  t = '<b>' + eur(r.totale) + '</b> in ' + r.conteggio + ' movimenti<br><br>' +\n      righe.join('<br>');\n} else {\n  t = '<b>' + eur(r.totale) + '</b>\\n' + r.conteggio + ' movimenti';\n}\n\n// Cosa ha capito il modello, sempre in fondo. Senza questa riga un\n// fraintendimento sul periodo produrrebbe un numero sbagliato dall'aria\n// perfettamente credibile.\nconst pezzi = [];\nif (f.filtro.da || f.filtro.a) {\n  pezzi.push((f.filtro.da ? gg(f.filtro.da) + '/' + String(f.filtro.da).slice(0, 4) : 'inizio') +\n             ' → ' +\n             (f.filtro.a ? gg(f.filtro.a) + '/' + String(f.filtro.a).slice(0, 4) : 'oggi'));\n} else {\n  pezzi.push('tutto lo storico');\n}\nif (f.filtro.categoria) pezzi.push(esc(f.filtro.categoria));\nif (f.filtro.q) pezzi.push('\"' + esc(f.filtro.q) + '\"');\nif (f.filtro.tipo) pezzi.push(f.filtro.tipo);\n\nt += '<br><br><i>' + pezzi.join(' · ') + '</i>';\n\nreturn [{ json: {\n    text: t.slice(0, 4000),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -240
+      ],
+      "id": "8719884a-aa73-41ed-95ee-240171959dd6",
+      "name": "Formatta risposta"
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $json;\nreturn [{ json: {\ntext: e.errore ,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -48
+      ],
+      "id": "c2a9a153-f5d3-4e9c-8da0-b1539cb724fc",
+      "name": "Formatta errore"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1f636c8d-b40d-4703-8c56-6eadfc04e856",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        320,
+        288
+      ],
+      "id": "d49d31e9-7b44-403c-a5d9-82906a4efcdc",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body_json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        768,
+        -144
+      ],
+      "id": "bc1419fe-a3cf-44c2-9e12-fd9dfbc6e667",
+      "name": "Gemini domanda",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CRED_GEMINI",
+          "name": "Gemini"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_CATEGORY",
+          "mode": "list",
+          "cachedResultName": "Category",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        768,
+        192
+      ],
+      "id": "3a7d4863-d898-47a2-b587-b3aa36a56f2c",
+      "name": "Leggi Categorie",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "WL0zzKbwnzieSs6y",
+          "mode": "list",
+          "cachedResultName": "Rules",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/WL0zzKbwnzieSs6y"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        544,
+        192
+      ],
+      "id": "32c1ebe2-8f6d-4d56-aa5d-58d83d0f3882",
+      "name": "Leggi Regole",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data_evento": "={{ $json.riga.data_evento }}",
+            "data_inserimento": "={{ $json.riga.data_inserimento }}",
+            "fonte": "={{ $json.riga.fonte }}",
+            "tipo": "={{ $json.riga.tipo }}",
+            "importo": "={{ $json.riga.importo }}",
+            "valuta": "={{ $json.riga.valuta }}",
+            "conto": "={{ $json.riga.conto }}",
+            "esercente": "={{ $json.riga.esercente }}",
+            "categoria": "={{ $json.riga.categoria }}",
+            "sottocategoria": "={{ $json.riga.sottocategoria }}",
+            "note": "={{ $json.riga.note }}",
+            "testo_grezzo": "={{ $json.riga.testo_grezzo }}",
+            "hash_dedup": "={{ $json.riga.hash_dedup }}",
+            "stato": "={{ $json.riga.stato }}",
+            "confidenza": "={{ $json.riga.confidenza }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1888,
+        192
+      ],
+      "id": "5b77eb76-baa0-489f-ae7e-4cf767af726c",
+      "name": "Insert row",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_CATEGORY",
+          "mode": "list",
+          "cachedResultName": "Category",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        -144
+      ],
+      "id": "9ea3a52f-4ffb-4814-b5a4-e1a07f000e40",
+      "name": "Leggi Categorie1",
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "WF_SEARCH",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/WF_SEARCH",
+          "cachedResultName": "Leroy Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "q": "={{ $json.filtro.q }}",
+            "da": "={{ $json.filtro.da }}",
+            "a": "={{ $json.filtro.a }}",
+            "categoria": "={{ $json.filtro.categoria }}",
+            "tipo": "={{ $json.filtro.tipo }}",
+            "min": "={{ $json.filtro.min }}",
+            "max": "={{ $json.filtro.max }}"
+          },
+          "matchingColumns": [
+            "body_firstItem"
+          ],
+          "schema": [
+            {
+              "id": "q",
+              "displayName": "q",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "da",
+              "displayName": "da",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "a",
+              "displayName": "a",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "min",
+              "displayName": "min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "max",
+              "displayName": "max",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1440,
+        -240
+      ],
+      "id": "0731274f-bd46-4e49-89fe-708ff42d7d04",
+      "name": "Chiama ricerca"
+    },
+    {
+      "parameters": {
+        "operation": "sendRichMessage",
+        "chatId": "369010791",
+        "richMessageText": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1888,
+        -144
+      ],
+      "id": "afb21a81-d84a-4749-a809-97133ac782c5",
+      "name": "Send a rich message",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "hash_dedup",
+              "keyValue": "={{ $json.chiave }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        -384
+      ],
+      "id": "2ae720ec-8ed6-486c-9134-8e2c5a2844ba",
+      "name": "Trova transazione",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "hash_dedup",
+              "keyValue": "={{ $('Leggi conferma').first().json.chiave }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "categoria": "={{ $('Leggi conferma').first().json.categoria }}",
+            "confidenza": 1,
+            "stato": "confermata"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        544,
+        -384
+      ],
+      "id": "3b7260ab-6df5-4961-980a-04f6033235a7",
+      "name": "Aggiorna transazione"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "hash_dedup",
+              "keyValue": "={{ $json.hash }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "stato": "={{ $json.stato }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        544,
+        -576
+      ],
+      "id": "eb42d9eb-dc03-42e8-807a-543afca35b25",
+      "name": "Aggiorna transazione1"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "WL0zzKbwnzieSs6y",
+          "mode": "list",
+          "cachedResultName": "Rules",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/WL0zzKbwnzieSs6y"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "utilizzi": 0,
+            "pattern": "={{ $('Trova transazione').first().json.esercente || $('Trova transazione').first().json.note }}",
+            "categoria": "={{ $('Leggi conferma').first().json.categoria }}",
+            "creata_il": "={{ $now.toFormat('yyyy-MM-dd') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "pattern",
+              "displayName": "pattern",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "creata_il",
+              "displayName": "creata_il",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "utilizzi",
+              "displayName": "utilizzi",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        992,
+        -448
+      ],
+      "id": "8e29978a-a244-49c3-a532-b1dc87699ef6",
+      "name": "Insert row1"
+    },
+    {
+      "parameters": {
+        "operation": "sendRichMessage",
+        "chatId": "369010791",
+        "richMessageText": "={{ $('Componi riga').item.json.payload.text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[0][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[0][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[0][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[0][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[1][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[1][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[1][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[1][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[2][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[2][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[2][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[2][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[3][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[3][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[3][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[3][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[4][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[4][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[4][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[4][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[5][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[5][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[5][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[5][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[6][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[6][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[6][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[6][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[7][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[7][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[7][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[7][0].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[8][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[8][1].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[8][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[8][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[9][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[9][0].callback_data }}"
+                    }
+                  },
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[9][1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[9][1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[10][0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[10][0].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2112,
+        192
+      ],
+      "id": "0b40659f-24e1-4015-a0b5-944904fe1dfe",
+      "name": "Send a rich message1",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "queryId": "={{ $('Leggi conferma').first().json.callback_id }}",
+        "additionalFields": {
+          "text": "=Salvato: {{ $('Leggi conferma').first().json.categoria }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1216,
+        -384
+      ],
+      "id": "133b0c98-4b5f-425e-bf34-75f4a33db148",
+      "name": "Answer Query a callback",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "queryId": "={{ $('Leggi conferma').first().json.callback_id }}",
+        "additionalFields": {
+          "text": "={{ $('Conferma').first().json.testo }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        768,
+        -576
+      ],
+      "id": "4ec64b89-44ef-4ac1-81e1-79720d9d5463",
+      "name": "Answer Query a callback1",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendRichMessage",
+        "chatId": "369010791",
+        "richMessageText": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        544,
+        384
+      ],
+      "id": "82918215-3d81-4dc3-9b8c-9ecdde7cf308",
+      "name": "Send a rich message2",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendRichMessage",
+        "chatId": "={{ $json.message.chat.id }}",
+        "richMessageText": "=Questo non è il bot che stai cercando!",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        48
+      ],
+      "id": "9adf04c0-5276-4d9e-b31d-bd51bbe69c17",
+      "name": "Send a rich message3",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "sono io?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estrai transazione": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "è una conferma?": {
+      "main": [
+        [
+          {
+            "node": "Leggi conferma",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Estrai transazione",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serve AI?": {
+      "main": [
+        [
+          {
+            "node": "Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Componi riga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi riga": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi conferma": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decidi categoria": {
+      "main": [
+        [
+          {
+            "node": "Serve AI?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sono io?": {
+      "main": [
+        [
+          {
+            "node": "è una conferma?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a rich message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "main": [
+        [
+          {
+            "node": "Componi riga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "apprendimento?": {
+      "main": [
+        [
+          {
+            "node": "Insert row1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Answer Query a callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Conferma",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trova transazione",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferma": {
+      "main": [
+        [
+          {
+            "node": "Aggiorna transazione1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Leggi Categorie1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara domanda": {
+      "main": [
+        [
+          {
+            "node": "Gemini domanda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi filtro": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Chiama ricerca",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Formatta errore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatta risposta": {
+      "main": [
+        [
+          {
+            "node": "Send a rich message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatta errore": {
+      "main": [
+        [
+          {
+            "node": "Send a rich message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Leggi Regole",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a rich message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini domanda": {
+      "main": [
+        [
+          {
+            "node": "Leggi filtro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Regole": {
+      "main": [
+        [
+          {
+            "node": "Leggi Categorie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Categorie": {
+      "main": [
+        [
+          {
+            "node": "Decidi categoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Send a rich message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Categorie1": {
+      "main": [
+        [
+          {
+            "node": "Prepara domanda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chiama ricerca": {
+      "main": [
+        [
+          {
+            "node": "Formatta risposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trova transazione": {
+      "main": [
+        [
+          {
+            "node": "Aggiorna transazione",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggiorna transazione": {
+      "main": [
+        [
+          {
+            "node": "apprendimento?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggiorna transazione1": {
+      "main": [
+        [
+          {
+            "node": "Answer Query a callback1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row1": {
+      "main": [
+        [
+          {
+            "node": "Answer Query a callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a rich message1": {
+      "main": [
+        []
+      ]
+    },
+    "Send a rich message": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "WF_GUARDIANO",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "7efcdb74-dbba-49b4-b536-d21446ae831b",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "WF_TELEGRAM",
+  "tags": []
+}

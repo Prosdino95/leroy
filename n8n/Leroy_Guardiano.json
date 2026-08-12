@@ -1,0 +1,174 @@
+{
+  "name": "Leroy_Guardiano",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1072,
+        -16
+      ],
+      "id": "413d2cfe-2e1a-45ee-9a59-fca2a4f6102e",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Anti-alluvione: con il polling al minuto, un workflow rotto genererebbe\n// 1440 messaggi al giorno e finiresti per silenziare il bot — cioe' l'opposto\n// di quello che serve. La memoria statica sopravvive fra le esecuzioni.\nconst SILENZIO_MIN = 30;\n\nconst memoria = $getWorkflowStaticData('global');\nmemoria.visti = memoria.visti || {};\n\nconst e = $json || {};\nconst wf = e.workflow || {};\nconst ex = e.execution || {};\n\nconst nome = String(wf.name || wf.id || 'workflow ignoto');\nconst chiave = 'wf_' + (wf.id || nome);\nconst adesso = Date.now();\n\nconst ultimo = Number(memoria.visti[chiave] || 0);\nif (adesso - ultimo < SILENZIO_MIN * 60000) return [];   // già avvisato\n\nmemoria.visti[chiave] = adesso;\n\nconst msg = String(ex.error?.message || 'errore non descritto').slice(0, 400);\nconst nodo = ex.lastNodeExecuted ? '\\nNodo: ' + ex.lastNodeExecuted : '';\nconst link = ex.url ? '\\n' + ex.url : '';\n\nreturn [{ json: {\n    text: '🔴 ' + nome + '\\n' + msg + nodo + link +\n          '\\n\\n(silenzio per ' + SILENZIO_MIN + ' min su questo workflow)',\n    disable_web_page_preview: true,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        -16
+      ],
+      "id": "f57023d7-81d2-41a6-93ec-189f61d5d15a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 11
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1296,
+        -208
+      ],
+      "id": "4449aab7-108c-44a5-ac2c-80a6cf0d903c",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n\n// Quanti giorni di silenzio sono accettabili per ciascuna fonte.\n// Telegram e app non ci sono: sei tu a scriverle, il silenzio è normale.\nconst ATTESO_GG = { push: 7, gmail:30, outlook: 30 };\n\nconst MAX_DA_VERIFICARE = 5;\n\nconst tx = $('Leggi Transazioni').all().map(i => i.json);\nconst oggi = new Date();\nconst gg = (d) => (oggi - new Date(d)) / 86400000;\n\nconst problemi = [];\n\n// --- fonti silenziose ---\nfor (const [fonte, limite] of Object.entries(ATTESO_GG)) {\n  const righe = tx.filter(r => String(r.fonte) === fonte && r.data_inserimento);\n  if (!righe.length) continue;          // fonte mai usata: non è un guasto\n\n  const ultima = righe\n    .map(r => String(r.data_inserimento))\n    .sort()\n    .pop();\n\n  const giorni = Math.floor(gg(ultima));\n  if (giorni > limite) {\n    problemi.push('• ' + fonte + ': nessun movimento da ' + giorni + ' giorni');\n  }\n}\n\n// --- code che si accumulano ---\nconst daVerificare = tx.filter(r => String(r.stato) === 'da_verificare').length;\nif (daVerificare > MAX_DA_VERIFICARE) {\n  problemi.push('• ' + daVerificare + ' movimenti da verificare in attesa');\n}\n\nconst atteseVecchie = tx.filter(r =>\n  String(r.stato) === 'attesa' && r.data_evento && gg(r.data_evento) > 10).length;\nif (atteseVecchie) {\n  problemi.push('• ' + atteseVecchie + ' addebiti previsti scaduti da oltre 10 giorni');\n}\n\n// Nessun problema: silenzio. La conferma che la sentinella funziona arriva\n// dal report settimanale, che elenca lo stato delle fonti.\nif (!problemi.length) return [];\n\nreturn [{ json: {\n    text: '⚠️ Controllo giornaliero\\n\\n' + problemi.join('\\n'),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        -208
+      ],
+      "id": "dcc2ccaa-bd5a-45af-95cd-8bf4cfacca84",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1072,
+        -208
+      ],
+      "id": "e83449b5-47aa-40a5-8e09-1753a47b464c",
+      "name": "Get row(s)"
+    },
+    {
+      "parameters": {
+        "chatId": "369010791",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -624,
+        -112
+      ],
+      "id": "a50d0bfd-9163-4364-85a6-b28518ad65d7",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0ed80add-61b8-4441-aef2-547a4d002468",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "WF_GUARDIANO",
+  "tags": []
+}

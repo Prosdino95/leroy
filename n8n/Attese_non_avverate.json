@@ -1,0 +1,170 @@
+{
+  "name": "Attese non avverate",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const CHAT_ID = 369010791;\nconst GRAZIA = 3;      // giorni di tolleranza dopo la scadenza\nconst MAX = 5;         // non sommergere di messaggi\n\nconst oggi = new Date();\nconst scadute = $('Leggi Transazioni').all().map(i => i.json)\n  .filter(r => r.data_evento)\n  .filter(r => (oggi - new Date(r.data_evento)) / 86400000 > GRAZIA)\n  .sort((a, b) => String(a.data_evento).localeCompare(String(b.data_evento)))\n  .slice(0, MAX);\n\n\nif (!scadute.length) return [];\n\nreturn scadute.map(r => {\n  const g = String(r.data_evento).slice(8, 10) + '/' + String(r.data_evento).slice(5, 7);\n  const eti = r.esercente || r.note || r.categoria;\n  return { json: {\n      text: '⏳ Addebito non rilevato\\n' +\n            String(r.importo).replace('.', ',') + ' €  ' + eti +\n            '\\nera previsto per il ' + g,\n        inline_keyboard: [\n        { text: 'Registra', callback_data: 'att|' + r.hash_dedup + '|reg' },\n        { text: 'Annulla',  callback_data: 'att|' + r.hash_dedup + '|ann' },\n      ],\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "f82805ae-210f-4898-965b-ab9ed64192b7",
+      "name": "Attese scadute"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "stato",
+              "keyValue": "attesa"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        0
+      ],
+      "id": "65e8d2ac-daee-484b-8196-1f0019ed798e",
+      "name": "Leggi Transazioni",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "sendRichMessage",
+        "chatId": "369010791",
+        "richMessageText": "={{ $json.text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $json.inline_keyboard[0].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.inline_keyboard[0].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $json.inline_keyboard[1].text }}",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.inline_keyboard[1].callback_data }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        0
+      ],
+      "id": "8b0fd8a4-adaa-4f6e-a6cb-13361a570254",
+      "name": "Send a rich message",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -544,
+        0
+      ],
+      "id": "80bd12e1-d4b4-49d5-81b8-63a2ab9ed90d",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Attese scadute": {
+      "main": [
+        [
+          {
+            "node": "Send a rich message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Transazioni": {
+      "main": [
+        [
+          {
+            "node": "Attese scadute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Leggi Transazioni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "WF_GUARDIANO",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "29f18f97-46a7-4034-a503-d399038c7788",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "WF_ATTESE",
+  "tags": []
+}

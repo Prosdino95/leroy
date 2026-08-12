@@ -1,0 +1,1810 @@
+{
+  "name": "Leroy App",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "PATH",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1040,
+        336
+      ],
+      "id": "fae73d37-15b9-4b3c-8f65-d5af6cbe62c4",
+      "name": "Webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CRED_HEADER_AUTH_ANDROID",
+          "name": "Android"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        528,
+        240
+      ],
+      "id": "f8e42068-0664-424c-ac9c-68323632e36c",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a6d7f24f-72e0-4c6b-bf3e-d8284795f17e",
+                    "leftValue": "={{ $json.body.azione }}",
+                    "rightValue": "inserisci",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.azione }}",
+                    "rightValue": "budget",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d5106c24-6126-44cf-adc6-ba3c45e8a9ab"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "06abd443-c3d5-43df-9d68-88273f238bac",
+                    "leftValue": "={{ $json.body.azione }}",
+                    "rightValue": "riepilogo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "abfa7de3-5685-4cd5-b513-2e41f598c5c0",
+                    "leftValue": "={{ $json.body.azione }}",
+                    "rightValue": "movimenti",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d88cbef0-1125-4c30-be2e-4a0eeb8dcf27",
+                    "leftValue": "={{ $json.body.azione }}",
+                    "rightValue": "correggi",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "09563814-b1d8-4bae-83f0-87612cc932f9",
+                    "leftValue": "={{ $json.body.azione }}",
+                    "rightValue": "elimina",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "76aad340-4883-497c-8d21-341a528ed1aa",
+                    "leftValue": "={{ $json.body.azione }}",
+                    "rightValue": "andamento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "15be6b4b-322b-4d0c-96b3-c11c82e582e4",
+                    "leftValue": "={{ $json.body.azione }}",
+                    "rightValue": "cerca",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -816,
+        224
+      ],
+      "id": "b9ec9981-b496-40bf-acf7-ab309ba38662",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body || {};\nconst periodo = String(b.periodo || new Date().toISOString().slice(0, 7));\n\nconst tx  = $('Leggi Transazioni').all().map(i => i.json);\nconst cat = $('Leggi Categorie').all().map(i => i.json).filter(c => c.categoria);\n\nconst budget = {};\nconst tipoDi = {};\ncat.forEach(c => {\n  budget[c.categoria] = Number(c.budget_mensile) || 0;\n  tipoDi[c.categoria] = String(c.tipo || 'spesa').toLowerCase();\n});\n\nconst arr = n => Math.round(n * 100) / 100;\n\nlet entrate = 0, uscite = 0, daVerificare = 0;\nconst perCat = {};\n\n// startsWith copre giorno, mese e anno con lo stesso codice: e' il motivo\n// per cui le date sono in formato ISO.\ntx.forEach(r => {\n  if (!String(r.data_evento).startsWith(periodo)) return;\n  if (String(r.stato) === 'eliminata' || String(r.stato) === 'attesa') return;\n\n  const imp  = Number(r.importo) || 0;\n  const tipo = String(r.tipo);\n  console.log(r.data_evento,r.importo);\n  if (tipo === 'entrata') entrate += imp;\n  else if (tipo === 'spesa') uscite += imp;\n  else return;                                  // i giroconti non contano\n\n  if (String(r.stato) === 'da_verificare') daVerificare++;\n\n  const c = String(r.categoria || 'Senza categoria');\n  perCat[c] = (perCat[c] || 0) + imp;\n});\n\n// Il budget nel foglio e' mensile: va scalato al periodo richiesto.\n// Su un singolo giorno non ha senso, quindi niente barra.\nconst mult = periodo.length === 4 ? 12 : periodo.length === 7 ? 1 : 0;\n\nconst categorie = Object.keys(perCat)\n  .map(nome => ({\n    nome,\n    tipo: tipoDi[nome] || 'spesa',\n    speso: arr(perCat[nome]),\n    budget: arr((budget[nome] || 0) * mult),\n  }))\n  .sort((a, b2) => b2.speso - a.speso);\n\n// Attese ancora aperte, indipendenti dal periodo scelto: quello che sta per\n// uscire interessa sempre, anche guardando un mese passato.\nconst attese = tx\n  .filter(r => String(r.stato) === 'attesa' && r.data_evento)\n  .sort((a, b) => String(a.data_evento).localeCompare(String(b.data_evento)))\n  .map(r => ({\n    hash: String(r.hash_dedup || ''),\n    data: String(r.data_evento),\n    tipo: String(r.tipo || 'spesa'),\n    importo: Number(r.importo) || 0,\n    etichetta: String(r.esercente || r.note || ''),\n    categoria: String(r.categoria || ''),\n  }));\n\nconst attese_totale = arr(attese.reduce((s, a) => s + a.importo, 0));\n\nreturn [{ json: {\n  periodo,\n  entrate: arr(entrate),\n  uscite: arr(uscite),\n  saldo: arr(entrate - uscite),\n  da_verificare: daVerificare,\n  categorie,\n  attese,\n  attese_totale,\n  config: {\n    categorie_spesa:   cat.filter(c => tipoDi[c.categoria] === 'spesa').map(c => c.categoria),\n    categorie_entrata: cat.filter(c => tipoDi[c.categoria] === 'entrata').map(c => c.categoria),\n    conti: ['banca', 'contante', 'paypal', 'satispay', 'revolut'],\n  },\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -48
+      ],
+      "id": "40764389-5eb8-4a67-88bc-65744371d878",
+      "name": "Componi riepilogo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body || {};\nconst periodo   = String(b.periodo || new Date().toISOString().slice(0, 7));\nconst filtroCat = b.categoria ? String(b.categoria) : null;\nconst soloDaVer = b.solo_da_verificare === true;\n\nconst movimenti = $('Leggi Transazioni1').all().map(i => i.json)\n  .filter(r => !filtroCat || String(r.categoria) === filtroCat)\n  .filter(r => !soloDaVer || String(r.stato) === 'da_verificare')\n  .sort((a, b2) => String(b2.data_evento).localeCompare(String(a.data_evento)))\n  // Solo i campi che servono all'app: testo_grezzo puo' essere lungo\n  // migliaia di caratteri e moltiplicato per 800 righe affossa la risposta.\n  .map(r => ({\n    hash:      String(r.hash_dedup || ''),\n    data:      String(r.data_evento || ''),\n    importo:   Number(r.importo) || 0,\n    tipo:      String(r.tipo || 'spesa'),\n    etichetta: String(r.esercente || r.note || ''),\n    categoria: String(r.categoria || ''),\n    conto:     String(r.conto || ''),\n    fonte:     String(r.fonte || ''),\n    stato:     String(r.stato || ''),\n  }));\n\nreturn [{ json: { periodo, movimenti } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        144
+      ],
+      "id": "39dab0cc-da92-4424-a90a-3dc645aafc7b",
+      "name": "Componi movimenti"
+    },
+    {
+      "parameters": {
+        "jsCode": "function normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nfunction hash64(str) {\n  let h = 0xcbf29ce484222325n;\n  const p = 0x100000001b3n;\n  for (let i = 0; i < str.length; i++) {\n    h ^= BigInt(str.charCodeAt(i));\n    h = (h * p) & 0xffffffffffffffffn;\n  }\n  return h.toString(16).padStart(16, '0');\n}\n\nfunction uuid() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n  });\n}\n\nconst b = $('Webhook').first().json.body || {};\n\nconst importo = Number(b.importo);\nif (!importo || importo <= 0 || !isFinite(importo)) {\n  return [{ json: { valido: false, errore: 'importo non valido' } }];\n}\n\nconst tipo = b.tipo === 'entrata' ? 'entrata' : 'spesa';\nif (!b.categoria) {\n  return [{ json: { valido: false, errore: 'categoria mancante' } }];\n}\n\nconst data      = String(b.data || new Date().toISOString().slice(0, 10)).slice(0, 10);\nconst esercente = normalizza(b.esercente || '');\nconst conto     = String(b.conto || 'banca');\nconst adesso    = new Date().toISOString();\n\n// L'ultimo elemento fa le veci dell'id_esterno che nelle altre fonti\n// identifica il messaggio. Qui non c'e', e il timestamp garantisce che due\n// inserimenti volutamente identici restino distinti.\nconst hash = hash64([data, importo.toFixed(2), esercente, conto,\n                     'app_' + Date.now()].join('|'));\n\n// Stessa logica di deduplica della pipeline, ma NON scarta: l'utente ha\n// deciso lui di inserirla. Al massimo lo avvisa.\nconst minuti = (x, y) =>\n  Math.abs(new Date(x).getTime() - new Date(y).getTime()) / 60000;\n\nconst simile = $('Leggi Transazioni2').all().map(i => i.json).some(r =>\n  Number(r.importo) === importo &&\n  String(r.conto) === conto &&\n  r.data_inserimento &&\n  minuti(r.data_inserimento, adesso) <= 360\n);\n\nreturn [{ json: {\n  valido: true,\n  duplicato_sospetto: simile,\n  riga: {\n    id: uuid(),\n    data_evento: data,\n    data_inserimento: adesso,\n    fonte: 'app',\n    tipo,\n    importo: importo.toFixed(2),\n    valuta: 'EUR',\n    conto,\n    esercente,\n    categoria: String(b.categoria),\n    sottocategoria: '',\n    note: String(b.note || ''),\n    testo_grezzo: 'inserimento manuale da app',\n    hash_dedup: hash,\n    confidenza: '1.00',\n    stato: 'confermata',\n  },\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        -528
+      ],
+      "id": "3be453db-a5f3-4571-b338-34b1fc17253d",
+      "name": "Prepara inserimento"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8aef31c2-e9c0-46ae-bd33-f5c2e7e98022",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -144,
+        -528
+      ],
+      "id": "5f747df3-2cbb-40d6-b51f-48ad9874042c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Prepara inserimento').first().json;\nreturn [{ json: {\n  ok: true,\n  hash: p.riga.hash_dedup,\n  duplicato_sospetto: p.duplicato_sospetto,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -624
+      ],
+      "id": "68f2b481-9d0a-43ba-adea-2a16f7aa2633",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: false, errore: $json.errore || 'dati non validi' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -432
+      ],
+      "id": "5032e661-f3ab-411a-b586-9d2854bb698c",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body || {};\n\nif (!b.hash)      return [{ json: { ok: false, errore: 'hash mancante' } }];\nif (!b.categoria) return [{ json: { ok: false, errore: 'categoria mancante' } }];\n\nconst imp = Number(b.importo);\nif (!imp || imp <= 0 || !isFinite(imp)) {\n  return [{ json: { ok: false, errore: 'importo non valido' } }];\n}\n\nreturn [{ json: {\n  hash: String(b.hash),\n  categoria: String(b.categoria),\n  stato: String(b.stato || 'confermata'),\n  importo: imp.toFixed(2),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        336
+      ],
+      "id": "96483b5e-0890-422d-ae9c-e8d586c69aaf",
+      "name": "Prepara correzione"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        336
+      ],
+      "id": "76e33a16-cd2c-4a97-bffc-796bd4171fd5",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body || {};\nconst valori = b.valori || {};\n\nconst valide = new Set(\n  $('Leggi Categorie2').all().map(i => String(i.json.categoria)).filter(Boolean)\n);\n\n// Solo categorie che esistono davvero: un nome sbagliato creerebbe righe\n// fantasma o aggiornerebbe la riga sbagliata.\nconst items = Object.keys(valori)\n  .filter(c => valide.has(c))\n  .map(c => ({ json: {\n    categoria: c,\n    budget_mensile: Number(valori[c]) || 0,\n  }}));\n\nif (!items.length) return [{ json: { categoria: '', budget_mensile: 0 } }];\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -240
+      ],
+      "id": "6c459d33-9d4c-4952-b5e3-d1d017bf140f",
+      "name": "Espandi budget"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, aggiornate: $input.all().length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -240
+      ],
+      "id": "afe05403-ecf3-4b12-a196-0e8b0c4b17a6",
+      "name": "Componi riepilogo1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body || {};\nif (!b.hash) return [{ json: { ok: false, errore: 'hash mancante' } }];\nreturn [{ json: { hash: String(b.hash), stato: 'eliminata' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        528
+      ],
+      "id": "310f8fd1-ed49-4f3f-8a80-064fa92e2021",
+      "name": "Prepara eliminazione"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        528
+      ],
+      "id": "93d5e33a-8240-453b-b270-aa10676604d7",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body || {};\nconst filtroCat = b.categoria ? String(b.categoria) : null;\n\nconst tutte = [\n  ...$('Leggi Transazioni3').all().map(i => i.json),]\n\nconst oggi = new Date();\nconst mesi = [];\nfor (let k = 12; k >= 0; k--) {\n  const d = new Date(oggi.getFullYear(), oggi.getMonth() - k, 1);\n  mesi.push(d.toISOString().slice(0, 7));\n}\n\nconst arr = n => Math.round(n * 100) / 100;\n\nconst serie = mesi.map(mese => {\n  const righe = tutte.filter(r =>\n    String(r.data_evento).startsWith(mese) &&\n    (!filtroCat || String(r.categoria) === filtroCat));\n  const s = (t) => righe.filter(r => String(r.tipo) === t)\n                        .reduce((x, r) => x + (Number(r.importo) || 0), 0);\n  return { mese, uscite: arr(s('spesa')), entrate: arr(s('entrata')) };\n});\n\n// La media esclude il mese in corso, che è parziale e abbasserebbe il\n// riferimento proprio quando serve confrontarcisi.\nconst conclusi = serie.slice(0, -1);\nconst media_uscite = arr(\n  conclusi.reduce((s, m) => s + m.uscite, 0) / (conclusi.length || 1));\n\nreturn [{ json: { mesi: serie, media_uscite, categoria: filtroCat } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        720
+      ],
+      "id": "bb40ec0f-e23f-43df-aaf6-7581caa0e855",
+      "name": "Componi andamento"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_CATEGORY",
+          "mode": "list",
+          "cachedResultName": "Category",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -368,
+        -240
+      ],
+      "id": "a06042fd-4345-4367-a279-c85563f0d33c",
+      "name": "Leggi Categorie2"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_CATEGORY",
+          "mode": "list",
+          "cachedResultName": "Category",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "categoria",
+              "keyValue": "={{ $json.categoria }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "budget_mensile": "={{ $json.budget_mensile }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "n_transazioni",
+              "displayName": "n_transazioni",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "totale",
+              "displayName": "totale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "media",
+              "displayName": "media",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "media_mensile",
+              "displayName": "media_mensile",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "budget_mensile",
+              "displayName": "budget_mensile",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        -240
+      ],
+      "id": "187f8b36-e88b-4dc8-ace9-34f17c324e2e",
+      "name": "Update row(s)",
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_CATEGORY",
+          "mode": "list",
+          "cachedResultName": "Category",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        -48
+      ],
+      "id": "5534d000-a655-47da-846a-047eff124bff",
+      "name": "Leggi Categorie",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -144,
+        -48
+      ],
+      "id": "6207e7cb-b7ac-444b-b9fe-e73f22666bb3",
+      "name": "Leggi Transazioni",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "data_inserimento",
+              "condition": "like",
+              "keyValue": "={{ $('Webhook').item.json.body.periodo }}"
+            },
+            {
+              "keyName": "stato",
+              "condition": "neq",
+              "keyValue": "eliminata"
+            },
+            {
+              "keyName": "stato",
+              "condition": "neq",
+              "keyValue": "attesa"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        144
+      ],
+      "id": "547deb0d-7c3b-40f1-96c7-ded42bbf5d48",
+      "name": "Leggi Transazioni1",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "stato",
+              "condition": "neq",
+              "keyValue": "eliminata"
+            },
+            {
+              "keyName": "fonte",
+              "condition": "neq",
+              "keyValue": "app"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -592,
+        -528
+      ],
+      "id": "dd83cad6-d592-40ef-99b4-5e4192410558",
+      "name": "Leggi Transazioni2",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data_evento": "={{ $json.riga.data_evento }}",
+            "data_inserimento": "={{ $json.riga.data_inserimento }}",
+            "fonte": "={{ $json.riga.fonte }}",
+            "tipo": "={{ $json.riga.tipo }}",
+            "importo": "={{ $json.riga.importo }}",
+            "valuta": "={{ $json.riga.valuta }}",
+            "conto": "={{ $json.riga.conto }}",
+            "esercente": "={{ $json.riga.esercente }}",
+            "categoria": "={{ $json.riga.categoria }}",
+            "sottocategoria": "={{ $json.riga.sottocategoria }}",
+            "note": "={{ $json.riga.note }}",
+            "testo_grezzo": "={{ $json.riga.testo_grezzo }}",
+            "hash_dedup": "={{ $json.riga.hash_dedup }}",
+            "stato": "={{ $json.riga.stato }}",
+            "confidenza": "={{ $json.riga.confidenza }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        -624
+      ],
+      "id": "9fdf6279-9a40-4a65-aa11-a450da7c401e",
+      "name": "Insert row",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "hash_dedup",
+              "keyValue": "={{ $json.hash }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "hash_dedup": "={{ $json.hash }}",
+            "importo": "={{ $json.importo }}",
+            "confidenza": 1,
+            "categoria": "={{ $json.categoria }}",
+            "stato": "={{ $json.stato }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        336
+      ],
+      "id": "4b412481-d692-4ec1-a903-4f250541030f",
+      "name": "Update row(s)1",
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "hash_dedup",
+              "keyValue": "={{ $json.hash }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "hash_dedup": "={{ $json.hash }}",
+            "stato": "={{ $json.stato }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        528
+      ],
+      "id": "d23b3a68-26a2-45d8-a217-75224348bddb",
+      "name": "Update row(s)2",
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "stato",
+              "condition": "neq",
+              "keyValue": "eliminata"
+            },
+            {
+              "keyName": "stato",
+              "condition": "neq",
+              "keyValue": "attesa"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        720
+      ],
+      "id": "d28ff504-585a-478c-9c5a-a3692b142290",
+      "name": "Leggi Transazioni3",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const a = $('Webhook').first().json.body?.azione;\nreturn [{ json: {\n  ok: false,\n  errore: 'azione sconosciuta: ' + (a || '(vuota)'),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        1104
+      ],
+      "id": "3b4c69cc-fec5-44d6-a1b1-4e1a5ad4ce87",
+      "name": "Error"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "WF_SEARCH",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/WF_SEARCH",
+          "cachedResultName": "Leroy Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "q": "={{ $json.body.q }}",
+            "da": "={{ $json.body.da }}",
+            "a": "={{ $json.body.a }}",
+            "categoria": "={{ $json.body.categoria }}",
+            "tipo": "={{ $json.body.tipo }}",
+            "min": "={{ $json.body.min }}",
+            "max": "={{ $json.body.max }}"
+          },
+          "matchingColumns": [
+            "body_firstItem"
+          ],
+          "schema": [
+            {
+              "id": "q",
+              "displayName": "q",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "da",
+              "displayName": "da",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "a",
+              "displayName": "a",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "min",
+              "displayName": "min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "max",
+              "displayName": "max",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        304,
+        912
+      ],
+      "name": "Call Leroy Search",
+      "id": "9d0d37a4-5e8c-4d0e-8995-86dc0d3be14b"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Leggi Transazioni2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leggi Categorie2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leggi Transazioni",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leggi Transazioni1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepara correzione",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepara eliminazione",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leggi Transazioni3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Leroy Search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi riepilogo": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi movimenti": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara inserimento": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara correzione": {
+      "main": [
+        [
+          {
+            "node": "Update row(s)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Espandi budget": {
+      "main": [
+        [
+          {
+            "node": "Update row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi riepilogo1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara eliminazione": {
+      "main": [
+        [
+          {
+            "node": "Update row(s)2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi andamento": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Categorie2": {
+      "main": [
+        [
+          {
+            "node": "Espandi budget",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row(s)": {
+      "main": [
+        [
+          {
+            "node": "Componi riepilogo1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Categorie": {
+      "main": [
+        [
+          {
+            "node": "Componi riepilogo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Transazioni": {
+      "main": [
+        [
+          {
+            "node": "Leggi Categorie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Transazioni1": {
+      "main": [
+        [
+          {
+            "node": "Componi movimenti",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Transazioni2": {
+      "main": [
+        [
+          {
+            "node": "Prepara inserimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row(s)1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row(s)2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Transazioni3": {
+      "main": [
+        [
+          {
+            "node": "Componi andamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Leroy Search": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "WF_GUARDIANO",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "0e92271a-e276-46cc-8411-bf313aa10f0f",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "WF_APP",
+  "tags": []
+}

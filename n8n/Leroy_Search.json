@@ -1,0 +1,129 @@
+{
+  "name": "Leroy Search",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const b = $('Start').first().json || {};\n\nconsole.log(b)\n\nfunction normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nconst q = normalizza(b.q);\nconst parole = q ? q.split(' ').filter(Boolean) : [];\n\nconst tutte = [\n  ...$('Leggi Transazioni4').all().map(i => i.json),];\n\nconst arr = n => Math.round(n * 100) / 100;\n\nconst trovati = tutte.filter(r => {\n  const d = String(r.data_evento).slice(0, 10);\n  if (b.da && d < String(b.da)) return false;\n  if (b.a && d > String(b.a)) return false;\n  if (b.categoria && String(r.categoria) !== String(b.categoria)) return false;\n  if (b.tipo && String(r.tipo) !== String(b.tipo)) return false;\n  const imp = Number(r.importo) || 0;\n  if (b.min != null && imp < Number(b.min)) return false;\n  if (b.max != null && imp > Number(b.max)) return false;\n  if (!parole.length) return true;\n\n  // Tutte le parole devono comparire da qualche parte: cercando\n  // \"bar michele\" non voglio tutti i bar.\n  const testo = normalizza([r.esercente, r.note, r.categoria, r.conto].join(' '));\n  return parole.every(p => testo.includes(p));\n});\n\nconst perCat = {};\nlet totale = 0;\nfor (const r of trovati) {\n  if (String(r.tipo) !== 'spesa') continue;\n  const imp = Number(r.importo) || 0;\n  totale += imp;\n  const c = String(r.categoria || 'Senza categoria');\n  perCat[c] = (perCat[c] || 0) + imp;\n}\n\nconst limite = Math.min(Number(b.limite) || 100, 300);\n\nreturn [{ json: {\n  totale: arr(totale),\n  conteggio: trovati.length,\n  per_categoria: Object.keys(perCat)\n    .map(nome => ({ nome, totale: arr(perCat[nome]) }))\n    .sort((x, y) => y.totale - x.totale),\n  movimenti: trovati\n    .sort((x, y) => String(y.data_evento).localeCompare(String(x.data_evento)))\n    .slice(0, limite)\n    .map(r => ({\n      hash: String(r.hash_dedup || ''),\n      data: String(r.data_evento),\n      importo: Number(r.importo) || 0,\n      tipo: String(r.tipo || 'spesa'),\n      etichetta: String(r.esercente || r.note || ''),\n      categoria: String(r.categoria || ''),\n      conto: String(r.conto || ''),\n      fonte: String(r.fonte || ''),\n      stato: String(r.stato || ''),\n    })),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        912
+      ],
+      "id": "ab0e41f7-c3ab-4ab5-ae4e-f89a61f90a99",
+      "name": "Componi ricerca"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "stato",
+              "condition": "neq",
+              "keyValue": "=eliminata"
+            },
+            {
+              "keyName": "stato",
+              "condition": "neq",
+              "keyValue": "=attesa"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        912
+      ],
+      "id": "1203c7ad-e253-400a-88b1-b014dab7e171",
+      "name": "Leggi Transazioni4",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "q"
+            },
+            {
+              "name": "da"
+            },
+            {
+              "name": "a"
+            },
+            {
+              "name": "categoria"
+            },
+            {
+              "name": "tipo"
+            },
+            {
+              "name": "min"
+            },
+            {
+              "name": "max"
+            }
+          ]
+        }
+      },
+      "id": "f5d31e22-88bd-49c5-8632-3b92d03669f8",
+      "typeVersion": 1.1,
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -128,
+        912
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Leggi Transazioni4": {
+      "main": [
+        [
+          {
+            "node": "Componi ricerca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Leggi Transazioni4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "WF_GUARDIANO",
+    "availableInMCP": false
+  },
+  "versionId": "b60c624d-3d1c-4751-90d9-a2c2d3866971",
+  "meta": {},
+  "nodeGroups": [],
+  "id": "WF_SEARCH",
+  "tags": []
+}

@@ -1,0 +1,166 @@
+{
+  "name": "Report periodico",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -560,
+        -16
+      ],
+      "id": "9a415517-73b0-4cd2-9b96-b2eb8e837dca",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const TZ = 'Europe/Rome';\n\n/* ---------- dati ---------- */\n\nconst tutte = [\n  ...$('Leggi Transazioni').all().map(i => i.json),\n].filter(r => r.data_evento &&\n              !['eliminata', 'attesa'].includes(String(r.stato)));\n\nconst attese = $('Leggi Transazioni').all().map(i => i.json)\n  .filter(r => String(r.stato) === 'attesa' && r.data_evento);\n\nconst budget = {};\n$('Leggi Categorie').all().map(i => i.json).forEach(c => {\n  if (c.categoria) budget[c.categoria] = Number(c.budget_mensile) || 0;\n});\n\n/* ---------- date ---------- */\n\nconst oggiStr = new Date().toLocaleDateString('sv-SE', { timeZone: TZ }); // YYYY-MM-DD\nconst oggi = new Date(oggiStr + 'T12:00:00');\nconst giornoMese = oggi.getDate();\nconst giornoSett = oggi.getDay();           // 0 dom, 1 lun\n\nconst iso = (d) => d.toISOString().slice(0, 10);\nconst menoGiorni = (d, n) => { const x = new Date(d); x.setDate(x.getDate() - n); return x; };\nconst meseDi = (d) => iso(d).slice(0, 7);\n\n/* ---------- utilita' ---------- */\n\nconst eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction somma(righe, tipo) {\n  return righe.filter(r => String(r.tipo) === tipo)\n              .reduce((s, r) => s + (Number(r.importo) || 0), 0);\n}\n\nfunction nelPeriodo(prefisso) {\n  return tutte.filter(r => String(r.data_evento).startsWith(prefisso));\n}\n\nfunction fraDate(da, a) {\n  return tutte.filter(r => {\n    const d = String(r.data_evento).slice(0, 10);\n    return d >= da && d <= a;\n  });\n}\n\nfunction perCategoria(righe) {\n  const m = {};\n  righe.filter(r => String(r.tipo) === 'spesa').forEach(r => {\n    const c = String(r.categoria || 'Senza categoria');\n    m[c] = (m[c] || 0) + (Number(r.importo) || 0);\n  });\n  return m;\n}\n\nfunction mediana(v) {\n  if (!v.length) return 0;\n  const s = v.slice().sort((a, b) => a - b);\n  const h = Math.floor(s.length / 2);\n  return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2;\n}\n\nfunction variazione(ora, prima) {\n  if (!prima) return '';\n  const p = Math.round((ora - prima) / prima * 100);\n  if (Math.abs(p) < 3) return ' (in linea)';\n  return ' (' + (p > 0 ? '+' : '') + p + '%)';\n}\n\n/* ---------- stato fonti, usato nel settimanale ---------- */\n\nfunction statoFonti() {\n  const fonti = ['push', 'gmail', 'outlook', 'telegram', 'app'];\n  const out = [];\n  for (const f of fonti) {\n    const righe = tutte.filter(r => String(r.fonte) === f && r.data_inserimento);\n    if (!righe.length) continue;\n    const ultima = righe.map(r => String(r.data_inserimento)).sort().pop();\n    const gg = Math.floor((oggi - new Date(ultima)) / 86400000);\n    out.push(f + ' ' + (gg <= 1 ? 'oggi' : gg + 'g'));\n  }\n  return out.join(' · ');\n}\n\n/* ============================================================\n   REPORT SETTIMANALE — lunedi'\n   ============================================================ */\n\nfunction settimanale() {\n  const da = iso(menoGiorni(oggi, 7));\n  const a = iso(menoGiorni(oggi, 1));\n  const righe = fraDate(da, a);\n  const uscite = somma(righe, 'spesa');\n\n  // Media delle quattro settimane precedenti: dice se questa e' fuori scala.\n  const precedenti = [];\n  for (let k = 2; k <= 5; k++) {\n    precedenti.push(somma(fraDate(iso(menoGiorni(oggi, 7 * k)),\n                                  iso(menoGiorni(oggi, 7 * (k - 1) + 1))), 'spesa'));\n  }\n  const media4 = precedenti.reduce((s, v) => s + v, 0) / (precedenti.length || 1);\n\n  const cat = perCategoria(righe);\n  const top = Object.keys(cat).sort((x, y) => cat[y] - cat[x]).slice(0, 4);\n\n  // Andamento del mese in corso rispetto al budget, proporzionato ai giorni.\n  const mese = nelPeriodo(meseDi(oggi));\n  const catMese = perCategoria(mese);\n  const giorniMese = new Date(oggi.getFullYear(), oggi.getMonth() + 1, 0).getDate();\n  const quota = giornoMese / giorniMese;\n\n  const sforati = Object.keys(catMese)\n    .filter(c => budget[c] > 0 && catMese[c] > budget[c] * quota * 1.15)\n    .sort((x, y) => (catMese[y] / budget[y]) - (catMese[x] / budget[x]))\n    .slice(0, 4);\n\n  const prossime = attese\n    .filter(r => String(r.data_evento) <= iso(menoGiorni(oggi, -7)))\n    .sort((x, y) => String(x.data_evento).localeCompare(String(y.data_evento)));\n\n  const daVer = $('Leggi Transazioni').all().map(i => i.json)\n    .filter(r => String(r.stato) === 'da_verificare').length;\n\n  let t = '<b>Settimana ' + da.slice(8) + '–' + a.slice(8) + '/' + a.slice(5, 7) + '</b><br>';\n  t += 'Spese: <b>' + eur(uscite) + '</b>' + variazione(uscite, media4) + '<br>';\n  t += '<i>media 4 settimane: ' + eur(media4) + '</i><br>';\n\n  if (top.length) {\n    t += '<br><pre>';\n    for (const c of top) t += esc(c.slice(0, 20).padEnd(21)) + eur(cat[c]).padStart(10) + '\\n';\n    t += '</pre>';\n  }\n\n  if (sforati.length) {\n    t += '<br><b>Oltre il ritmo del budget</b><br>';\n    for (const c of sforati) {\n      t += '• ' + esc(c) + ': ' + eur(catMese[c]) + ' su ' + eur(budget[c]) + '<br>';\n    }\n  }\n\n  if (prossime.length) {\n    t += '<br><b>In arrivo</b><br>';\n    for (const r of prossime.slice(0, 5)) {\n      t += '• ' + String(r.data_evento).slice(8) + '/' + String(r.data_evento).slice(5, 7) +\n           ' ' + esc(r.esercente || r.note || r.categoria) + ' ' + eur(Number(r.importo)) + '<br>';\n    }\n  }\n\n  if (daVer) t += '<br>' + daVer + ' movimenti da verificare<br>';\n\n  t += '<br><i>Fonti: ' + esc(statoFonti()) + '</i>';\n  return t;\n}\n\n/* ============================================================\n   REPORT MENSILE — il primo del mese, sul mese appena chiuso\n   ============================================================ */\n\nfunction mensile() {\n  const primo = new Date(oggi.getFullYear(), oggi.getMonth(), 1);\n  const chiuso = meseDi(menoGiorni(primo, 1));                 // mese precedente\n  const prima = meseDi(menoGiorni(new Date(chiuso + '-15'), 30));\n  const annoPrima = (Number(chiuso.slice(0, 4)) - 1) + chiuso.slice(4);\n\n  const righe = nelPeriodo(chiuso);\n  const uscite = somma(righe, 'spesa');\n  const entrate = somma(righe, 'entrata');\n\n  const usPrima = somma(nelPeriodo(prima), 'spesa');\n  const usAnno = somma(nelPeriodo(annoPrima), 'spesa');\n\n  const cat = perCategoria(righe);\n\n  // Mediana della stessa categoria negli ultimi 12 mesi: identifica cosa e'\n  // fuori linea rispetto alle tue abitudini, non rispetto al budget.\n  const mesiStorici = [];\n  for (let k = 1; k <= 12; k++) {\n    mesiStorici.push(meseDi(menoGiorni(new Date(chiuso + '-15'), 30 * k)));\n  }\n  const storiche = {};\n  for (const c of Object.keys(cat)) {\n    storiche[c] = mediana(mesiStorici.map(m => perCategoria(nelPeriodo(m))[c] || 0));\n  }\n\n  const fuoriLinea = Object.keys(cat)\n    .filter(c => storiche[c] > 20 && Math.abs(cat[c] - storiche[c]) / storiche[c] > 0.3)\n    .sort((x, y) => Math.abs(cat[y] - storiche[y]) - Math.abs(cat[x] - storiche[x]))\n    .slice(0, 4);\n\n  const maggiore = righe.filter(r => String(r.tipo) === 'spesa')\n    .sort((x, y) => Number(y.importo) - Number(x.importo))[0];\n\n  const gMese = new Date(Number(chiuso.slice(0, 4)), Number(chiuso.slice(5, 7)), 0).getDate();\n\n  // Da inizio anno, confrontato con lo stesso intervallo dell'anno prima.\n  const anno = chiuso.slice(0, 4);\n  const ytd = somma(tutte.filter(r => {\n    const d = String(r.data_evento);\n    return d >= anno + '-01-01' && d <= chiuso + '-31';\n  }), 'spesa');\n  const ytdPrima = somma(tutte.filter(r => {\n    const d = String(r.data_evento);\n    const a1 = String(Number(anno) - 1);\n    return d >= a1 + '-01-01' && d <= a1 + chiuso.slice(4) + '-31';\n  }), 'spesa');\n\n  let t = '<b>Chiusura ' + chiuso + '</b><br>';\n  t += 'Entrate: ' + eur(entrate) + '<br>';\n  t += 'Uscite: <b>' + eur(uscite) + '</b>' + variazione(uscite, usPrima) + '<br>';\n  t += 'Saldo: <b>' + eur(entrate - uscite) + '</b><br>';\n  t += '<i>media ' + eur(uscite / gMese) + ' al giorno</i><br>';\n  if (usAnno) t += '<i>stesso mese ' + annoPrima.slice(0, 4) + ': ' + eur(usAnno) + '</i><br>';\n\n  const ordinate = Object.keys(cat).sort((x, y) => cat[y] - cat[x]).slice(0, 10);\n  t += '<br><pre>';\n  for (const c of ordinate) {\n    const b = budget[c] > 0 ? eur(budget[c]).replace(' €', '') : '—';\n    t += esc(c.slice(0, 17).padEnd(18)) + eur(cat[c]).replace(' €', '').padStart(9) +\n         ' /' + b.padStart(8) + '\\n';\n  }\n  t += '</pre>';\n\n  if (fuoriLinea.length) {\n    t += '<br><b>Fuori dalle abitudini</b><br>';\n    for (const c of fuoriLinea) {\n      const d = cat[c] - storiche[c];\n      t += '• ' + esc(c) + ': ' + eur(cat[c]) + ', solito ' + eur(storiche[c]) +\n           ' (' + (d > 0 ? '+' : '') + eur(d) + ')<br>';\n    }\n  }\n\n  if (maggiore) {\n    t += '<br>Spesa maggiore: ' + eur(Number(maggiore.importo)) + ' — ' +\n         esc(maggiore.esercente || maggiore.note || maggiore.categoria) + '<br>';\n  }\n\n  if (ytdPrima) {\n    t += '<br>Da inizio anno: ' + eur(ytd) + ' contro ' + eur(ytdPrima) +\n         variazione(ytd, ytdPrima);\n  }\n\n  return t;\n}\n\n/* ---------- quale report oggi ---------- */\n\nlet testo = null;\nif (giornoMese === 1) testo = mensile();        // il mensile ha la precedenza\nelse if (giornoSett === 1) testo = settimanale();\n\nif (!testo) return [];\n\nreturn { json: {\n    text: (testo.slice(0, 4000)),      // Telegram si ferma a 4096\n}};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -16
+      ],
+      "id": "53d73686-4bd7-4158-9beb-2216b44771be",
+      "name": "Componi report"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -336,
+        -16
+      ],
+      "id": "dc9f7dc6-642a-4f91-8db9-8124768023ee",
+      "name": "Leggi Transazioni",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_CATEGORY",
+          "mode": "list",
+          "cachedResultName": "Category",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -112,
+        -16
+      ],
+      "id": "b6d1abd9-d34c-40be-a6bb-ab4dab88e428",
+      "name": "Leggi Categorie",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "sendRichMessage",
+        "chatId": "369010791",
+        "richMessageText": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        -16
+      ],
+      "id": "95dfe25b-e66c-4d8d-a48d-d5f68a2fb00b",
+      "name": "Send a rich message",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Leggi Transazioni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi report": {
+      "main": [
+        [
+          {
+            "node": "Send a rich message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Transazioni": {
+      "main": [
+        [
+          {
+            "node": "Leggi Categorie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Categorie": {
+      "main": [
+        [
+          {
+            "node": "Componi report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "WF_GUARDIANO",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "7c894d57-c8cb-4f4f-b5bd-c17a79ee9b2c",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "WF_REPORT_PERIODICO",
+  "tags": []
+}

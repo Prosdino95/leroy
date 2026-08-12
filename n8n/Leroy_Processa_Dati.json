@@ -1,0 +1,934 @@
+{
+  "name": "Leroy Processa Dati",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "fonte"
+            },
+            {
+              "name": "id_esterno"
+            },
+            {
+              "name": "mittente"
+            },
+            {
+              "name": "oggetto"
+            },
+            {
+              "name": "testo"
+            },
+            {
+              "name": "data"
+            }
+          ]
+        }
+      },
+      "id": "0cb4bd4f-e44a-4b43-936e-43a201180884",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -512,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const m = $json;\n\nfunction num(s) {\n  if (!s) return null;\n  // \"1.234,56\" -> 1234.56   |   \"1,234.56\" -> 1234.56\n  let t = String(s).trim();\n  if (/,\\d{1,2}$/.test(t)) t = t.replace(/\\./g, '').replace(',', '.');\n  else t = t.replace(/,/g, '');\n  const n = parseFloat(t);\n  return isNaN(n) ? null : n;\n}\n\n// Ogni estrattore: mittente da riconoscere + funzione che ritorna\n// { importo, esercente, tipo } oppure null se il formato non corrisponde.\nconst ESTRATTORI = [\n  {\n    nome: 'paypal',\n    quando: (e) => e.mittente.includes('paypal'),\n    estrai: (e) => {\n      const imp = e.testo.match(/(?:EUR|€)\\s*([\\d.,]+)/i);\n      const dest = e.testo.match(/(?:a|to)\\s+([A-Z][\\w\\s.'-]{2,40}?)\\s+(?:per|for|EUR|€)/);\n      if (!imp) return null;\n      return {\n        importo: num(imp[1]),\n        esercente: (dest?.[1] || 'paypal').toLowerCase().trim(),\n        tipo: /hai ricevuto|you received/i.test(e.testo) ? 'entrata' : 'spesa',\n      };\n    },\n  },\n];\n\nfor (const est of ESTRATTORI) {\n  if (!est.quando(m)) continue;\n  const r = est.estrai(m);\n  if (r && r.importo) {\n    return { json: { ...m, ...r, confidenza: 1, serve_ai: false, estrattore: est.nome } };\n  }\n  // Riconosciuto il mittente ma non il formato: passa all'AI invece di\n  // buttare via la mail. I template cambiano senza preavviso.\n}\n\n// --- Estrattore generico per bollette e fatture italiane ---\n// Ancorato alle parole chiave di totale: e' l'unico modo affidabile di\n// distinguere il totale dalle voci di dettaglio senza chiedere a un modello.\nconst RE_TOTALE = new RegExp(\n  '(totale\\\\s+(?:dovuto|documento|fattura|complessivo)?|importo\\\\s+(?:totale|da\\\\s+pagare)' +\n  '|totale\\\\s+da\\\\s+pagare|da\\\\s+pagare|addebito(?:\\\\s+di)?)' +\n  '\\\\s*[:\\\\-]?\\\\s*(?:EUR|€)?\\\\s*([\\\\d.\\\\s]*\\\\d(?:,\\\\d{2})?)', 'i');\n\n// Tutti gli importi presenti nel testo: serve a sapere se ce n'era uno solo\n// (nessuna ambiguita') o molti (voci di dettaglio, IVA, subtotali).\nconst tuttiImporti = [...m.testo.matchAll(/(?:EUR|€)\\s*([\\d.]*\\d(?:,\\d{2})?)|([\\d.]*\\d,\\d{2})\\s*(?:EUR|€)/gi)]\n  .map(x => num(x[1] || x[2]))\n  .filter(v => v && v > 0);\n\nconst totale = m.testo.match(RE_TOTALE);\n\n// --- Annuncio o addebito gia' avvenuto? ---\n// Le bollette con addebito diretto annunciano un prelievo futuro: registrarle\n// come spesa significa contarle due volte quando l'addebito arriva davvero.\nconst RE_ANNUNCIO = /addebito\\s+diretto|\\bsdd\\b|verr[àa]\\s+(?:addebitat|preleva)|sar[àa]\\s+addebitat|in\\s+scadenz|entro\\s+il\\s+\\d/i;\n\nconst RE_SCADENZA = new RegExp(\n  '(scadenz\\\\w*|addebit\\\\w*|pagamento\\\\s+previsto|entro\\\\s+il|verr[àa]\\\\s+addebitat\\\\w*)' +\n  '[^\\\\d]{0,40}(\\\\d{1,2}[\\\\/\\\\-.]\\\\d{1,2}[\\\\/\\\\-.]\\\\d{2,4})', 'i');\n\nfunction dataISO(s) {\n  if (!s) return null;\n  s = String(s).trim();\n  let x = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (x) return `${x[1]}-${x[2]}-${x[3]}`;\n  x = s.match(/(\\d{1,2})[\\/\\-.](\\d{1,2})[\\/\\-.](\\d{2,4})/);\n  if (!x) return null;\n  let [, g, me, a] = x;\n  if (a.length === 2) a = '20' + a;\n  return `${a}-${me.padStart(2, '0')}-${g.padStart(2, '0')}`;\n}\n\nconst scad = m.testo.match(RE_SCADENZA);\n\nreturn { json: {\n  ...m,\n  serve_ai: true,\n  // Suggerimenti passati a Gemini e usati per calibrare la fiducia.\n  totale_ancorato: totale ? num(totale[2]) : null,\n  sembra_annuncio: RE_ANNUNCIO.test(m.testo),\n  scadenza_ancorata: scad ? dataISO(scad[2]) : null,\n  importi_trovati: [...new Set(tuttiImporti)],\n}};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        288
+      ],
+      "id": "425f557e-7054-47c7-a9c5-2b737d9f99bc",
+      "name": "Estrattori"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f3fae8d1-f336-4478-b67a-d412850baeac",
+              "leftValue": "={{ $('Estrattori').firts().json.importo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        384,
+        288
+      ],
+      "id": "0cb661cb-e3b7-41cb-a068-436ac8f406be",
+      "name": "Serve AI?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body_json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        608,
+        224
+      ],
+      "id": "5fa8c36b-3648-4dee-965f-dafd411852f5",
+      "name": "Gemini",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CRED_GEMINI",
+          "name": "Gemini"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "function normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nfunction hash64(str) {\n  let h = 0xcbf29ce484222325n;\n  const p = 0x100000001b3n;\n  for (let i = 0; i < str.length; i++) {\n    h ^= BigInt(str.charCodeAt(i));\n    h = (h * p) & 0xffffffffffffffffn;\n  }\n  return h.toString(16).padStart(16, '0');\n}\n\nfunction uuid() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n  });\n}\n\nfunction dataISO(s) {\n  if (!s) return null;\n  s = String(s).trim();\n  let x = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (x) return `${x[1]}-${x[2]}-${x[3]}`;\n  x = s.match(/(\\d{1,2})[\\/\\-.](\\d{1,2})[\\/\\-.](\\d{2,4})/);\n  if (!x) return null;\n  let [, g, me, a] = x;\n  if (a.length === 2) a = '20' + a;\n  return `${a}-${me.padStart(2, '0')}-${g.padStart(2, '0')}`;\n}\n\nconst m = $('Estrattori').first().json;\nlet dati = { ...m };\n\nif (!m.importo) {\n  const risposta = $('Gemini').first().json;\n  const parts = risposta?.candidates?.[0]?.content?.parts || [];\n  const testo = parts.map(p => p.text).filter(Boolean).join('')\n    .replace(/```json|```/g, '').trim();\n\n  if (!testo) {\n    throw new Error('Gemini non ha restituito testo: ' + JSON.stringify(risposta).slice(0, 300));\n  }\n\n  let p;\n  try {\n    p = JSON.parse(testo);\n  } catch (e) {\n    throw new Error('JSON non parsabile da Gemini: ' + testo.slice(0, 300));\n  }\n\n  if (!p.e_transazione) return [];   // non era una transazione: corretto uscire\n\n  dati = { ...m, ...p, confidenza: Number(p.confidenza) || 0.5 };\n}\n\nif (!dati.importo || dati.importo <= 0) return [];\n\nlet confidenza = Number(dati.confidenza || 0.5);\nlet avviso = '';\n\nconst nota = (t) => { avviso = avviso ? avviso + ' — ' + t : t; };\n\n// --- Plausibilita' dell'importo ---\n// Se nel testo c'erano piu' cifre e quella scelta non coincide col totale\n// ancorato a parola chiave, la fiducia scende e la riga nasce da verificare.\nconst alternativi = (m.importi_trovati || []).filter(v => v !== Number(dati.importo));\n\nif (m.totale_ancorato && Number(dati.importo) !== m.totale_ancorato) {\n  confidenza = Math.min(confidenza, 0.5);\n  nota('il testo indicava come totale ' + m.totale_ancorato);\n} else if (alternativi.length > 0 && !m.totale_ancorato) {\n  confidenza = Math.min(confidenza, 0.6);\n  nota('altri importi nel testo: ' + alternativi.slice(0, 5).join(', '));\n}\n\n// --- Validita' della categoria ---\n// Le categorie sono fisse: quelle del foglio, nessuna in piu'. Gemini propone,\n// qui si verifica. Il confronto normalizzato perdona maiuscole e accenti e\n// riconduce al nome esatto del foglio.\nconst ammesse = $('Prepara').first().json.categorie || [];\nconst trovata = ammesse.find(c => normalizza(c) === normalizza(dati.categoria));\nconst categoria = trovata || '';\n\nif (!trovata) {\n  confidenza = Math.min(confidenza, 0.3);\n  nota('categoria non valida: \"' + (dati.categoria || 'vuota') + '\"');\n}\n\nconst daVerificare = confidenza < 0.75;\n\n// --- Momento: addebito avvenuto o soltanto annunciato? ---\n// Il modello propone, il codice verifica: un annuncio senza una data futura\n// non è un annuncio. È la stessa logica applicata alla categoria, dove la\n// proposta viene confrontata con l'elenco reale.\nconst dataMsg = String(dati.data).slice(0, 10);\nconst prev = dataISO(dati.data_prevista) || m.scadenza_ancorata || null;\nconst annuncio = dati.momento === 'annuncio' && !!prev && prev > dataMsg;\n\nif (dati.momento === 'annuncio' && !annuncio) {\n  nota('dichiarato annuncio ma senza data futura: registrato come addebito');\n}\n\n// Un'attesa vale alla data prevista, un addebito a quella del messaggio.\nconst data = annuncio ? prev : dataMsg;\n\nconst esercente = normalizza(dati.esercente);\n\nconst conto = /paypal/.test(m.mittente) ? 'paypal'\n            : /satispay/.test(m.mittente) ? 'satispay'\n            : /revolut/.test(m.mittente) ? 'revolut'\n            : 'banca';\n\n// Calcolato dopo che la data è definitiva, altrimenti per le attese l'hash\n// descriverebbe un giorno diverso da quello scritto nella riga.\nconst hash = hash64([data, Number(dati.importo).toFixed(2), esercente,\n                     conto, m.id_esterno].join('|'));\n\nconst statoRiga = annuncio ? 'attesa'\n                : daVerificare ? 'da_verificare'\n                : 'confermata';\n\nreturn [{ json: {\n  riga: {\n    id: uuid(),\n    data_evento: data,\n    data_inserimento: new Date().toISOString(),\n    fonte: m.fonte,\n    tipo: dati.tipo || 'spesa',\n    importo: Number(dati.importo).toFixed(2),\n    valuta: 'EUR',\n    conto,\n    esercente,\n    categoria,\n    sottocategoria: '',\n    note: dati.oggetto || '',\n    testo_grezzo: (m.mittente + ' | ' + m.oggetto).slice(0, 500),\n    hash_dedup: hash,\n    confidenza: confidenza.toFixed(2),\n    stato: statoRiga,\n  },\n  avviso,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        288
+      ],
+      "id": "8d757eef-a370-44dd-9722-4e0912fddaf2",
+      "name": "Componi riga"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n//  Controlla duplicati — decide se scrivere, riconciliare o scartare\n// ============================================================\n\n\nconst FINESTRA_ALTRA_FONTE_ORE = 6; // stessa spesa vista da due canali\nconst FINESTRA_STESSA_FONTE_MIN = 3;// reinvio tecnico dallo stesso canale\nconst FINESTRA_ATTESA_GG = 12;      // scarto ammesso sulla data prevista\nconst TOLL_IMPORTO = 0.02;          // scarto ammesso sull'importo\n\nconst nuova = $('Componi riga').first().json.riga;\nconst avviso = $('Componi riga').first().json.avviso || '';\nconst esistenti = $('Leggi recenti').all().map(i => i.json);\n\nconst minuti = (a, b) =>\n  Math.abs(new Date(a).getTime() - new Date(b).getTime()) / 60000;\nconst giorni = (a, b) =>\n  Math.abs(new Date(a).getTime() - new Date(b).getTime()) / 86400000;\n\nconst eImporto = String(nuova.importo).replace('.', ',');\n\n// helper per costruire la notifica Telegram\nconst notifica = (testo) => { text: testo };\n\n\n// ------------------------------------------------------------\n// 1) Lo stesso messaggio è già stato processato\n// ------------------------------------------------------------\nif (esistenti.some(r => String(r.hash_dedup) === nuova.hash_dedup)) {\n  return [{ json: { esito: 'scarta', motivo: 'già processata', riga: nuova } }];\n}\n\n\n// ------------------------------------------------------------\n// 2) La nuova riga è un ANNUNCIO (bolletta con addebito futuro)\n//    Un annuncio non può essere duplicato di una spesa reale:\n//    l'unico rischio è il sollecito, cioè una seconda mail\n//    che riannuncia lo stesso addebito.\n// ------------------------------------------------------------\nif (nuova.stato === 'attesa') {\n\n  const giaAttesa = esistenti.find(r =>\n    String(r.stato) === 'attesa' &&\n    Math.abs(Number(r.importo) - Number(nuova.importo)) <= TOLL_IMPORTO &&\n    r.data_evento &&\n    giorni(r.data_evento, nuova.data_evento) <= FINESTRA_ATTESA_GG\n  );\n\n  if (giaAttesa) {\n    return [{ json: {\n      esito: 'scarta',\n      motivo: 'attesa già registrata per il ' + String(giaAttesa.data_evento),\n      riga: nuova,\n    }}];\n  }\n\n  const g = String(nuova.data_evento).slice(8, 10) + '/' +\n            String(nuova.data_evento).slice(5, 7);\n\n  return [{ json: {\n    esito: 'scrivi',\n    riga: nuova,\n    payload_json: notifica(\n      'Addebito previsto\\n' +\n      eImporto + ' €  ' + nuova.categoria +\n      (nuova.esercente ? '\\n' + nuova.esercente : '') +\n      '\\natteso per il ' + g\n    ),\n  }}];\n}\n\n\n// ------------------------------------------------------------\n// 3) È un addebito reale. Prima i duplicati.\n//    Attese ed eliminate non partecipano: non sono spese avvenute.\n// ------------------------------------------------------------\nconst confrontabili = esistenti.filter(r =>\n  !['attesa', 'eliminata'].includes(String(r.stato)) &&\n  Number(r.importo) === Number(nuova.importo) &&\n  String(r.conto) === String(nuova.conto) &&\n  r.data_inserimento\n);\n\nconst daAltraFonte = confrontabili.find(r =>\n  String(r.fonte) !== String(nuova.fonte) &&\n  minuti(r.data_inserimento, nuova.data_inserimento) <= FINESTRA_ALTRA_FONTE_ORE * 60\n);\n\nconst stessaFonte = confrontabili.find(r =>\n  String(r.fonte) === String(nuova.fonte) &&\n  minuti(r.data_inserimento, nuova.data_inserimento) <= FINESTRA_STESSA_FONTE_MIN\n);\n\nconst gemello = daAltraFonte || stessaFonte;\n\nif (gemello) {\n  return [{ json: {\n    esito: 'scarta',\n    motivo: 'duplicato di ' + gemello.fonte + ' delle ' +\n            String(gemello.data_inserimento).slice(11, 16),\n    riga: nuova,\n    gemello_id: gemello.id || '',\n  }}];\n}\n\n\n// ------------------------------------------------------------\n// 4) Chiude un'attesa registrata in precedenza?\n// ------------------------------------------------------------\nconst candidate = esistenti\n  .filter(r =>\n    String(r.stato) === 'attesa' &&\n    Math.abs(Number(r.importo) - Number(nuova.importo)) <= TOLL_IMPORTO &&\n    r.data_evento &&\n    giorni(r.data_evento, nuova.data_evento) <= FINESTRA_ATTESA_GG)\n  .sort((a, b) =>\n    giorni(a.data_evento, nuova.data_evento) - giorni(b.data_evento, nuova.data_evento));\n\nconst esempio = esistenti\n  .filter(r =>\n    String(r.stato) === 'attesa'&&\n    Math.abs(Number(r.importo) - Number(nuova.importo)) <= TOLL_IMPORTO &&\n    r.data_evento )\nconsole.log(esempio)\n\nif (candidate.length) {\n  const att = candidate[0];\n  const g = String(att.data_evento).slice(8, 10) + '/' +\n            String(att.data_evento).slice(5, 7);\n\n  return [{ json: {\n    esito: 'riconcilia',\n    chiave: String(att.hash_dedup),      // la riga da aggiornare\n    riga: nuova,\n    payload_json: notifica(\n      '✓ Addebito previsto concluso\\n' +\n      eImporto + ' €  ' + att.categoria +\n      (att.esercente ? '\\n' + att.esercente : '') +\n      '\\natteso per il ' + g +\n      (candidate.length > 1 ? '\\n⚠ ' + candidate.length + ' attese compatibili' : '')\n    ),\n  }}];\n}\n\n\n// ------------------------------------------------------------\n// 5) Nessuna delle precedenti: è una spesa nuova\n// ------------------------------------------------------------\nreturn [{ json: {\n  esito: 'scrivi',\n  riga: nuova,\n  payload_json: notifica(\n    (nuova.stato === 'da_verificare' ? '⚠ Importo da verificare\\n' : '') +\n    '− ' + eImporto + ' €  ' + nuova.categoria +\n    (nuova.esercente ? '\\n' + nuova.esercente : '') +\n    '\\n' + nuova.conto + '  (da ' + nuova.fonte + ')' +\n    (avviso ? '\\n' + avviso : '')\n  ),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        288
+      ],
+      "id": "b57bd1c3-cfab-4b8b-b047-357a435f9b16",
+      "name": "Controlla duplicati"
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Estrattori').first().json;\n\nconst categorie = $('Leggi Categorie').all()\n  .map(i => i.json.categoria)\n  .filter(Boolean);\n\nlet prompt = 'Da questa email estrai la transazione finanziaria, se c\\'è.\\n\\n' +\n  'Categorie ammesse:\\n' + categorie.join('\\n') + '\\n\\n' +\n  'Mittente: ' + m.mittente + '\\n' +\n  'Oggetto: ' + m.oggetto + '\\n' +\n  'Testo: ' + m.testo + '\\n\\n';\n\nif ((m.importi_trovati || []).length > 1) {\n  prompt += 'ATTENZIONE: nel testo compaiono più importi (' +\n    m.importi_trovati.join(', ') + '). Sono voci di dettaglio, imponibile, IVA ' +\n    'o subtotali. Restituisci SOLO il totale effettivamente addebitato.\\n';\n}\nif (m.totale_ancorato) {\n  prompt += 'Totale ancorato a parola chiave: ' + m.totale_ancorato +\n    '. Usalo salvo evidenza contraria.\\n';\n}\n\nprompt += '\\nRispondi solo con JSON: {\"e_transazione\": true|false, \"importo\": <numero>, \"esercente\": \"<chi>\", \"tipo\": \"spesa\"|\"entrata\", \"categoria\": \"<una>\", \"momento\": \"annuncio\"|\"addebito\", \"data_prevista\": \"YYYY-MM-DD\"|null, \"confidenza\": <0.0-1.0>}\\n' +\n  'Regole:\\n' +\n    '- momento \"addebito\" se l operazione e gia avvenuta: pagamenti con carta, notifiche bancarie, ricevute di acquisto. E il caso normale.\\n'+\n    '- momento \"annuncio\" se il testo comunica che un importo VERRA addebitato o scade in futuro (bollette con addebito diretto, fatture con scadenza).\\n'+\n      '- data_prevista solo per gli annunci: la data in cui avverra l addebito.\\n'+\n  '- e_transazione false per newsletter, promozioni, avvisi di sicurezza.\\n' +\n  '- e_transazione false per i riepiloghi con più movimenti distinti.\\n' +\n  '- importo = il totale pagato, mai una singola voce di dettaglio.\\n' +\n  '- confidenza bassa se non sei sicuro di quale sia il totale.';\n\nconst body = {\n  contents: [{ parts: [{ text: prompt }] }],\n  generationConfig: { responseMimeType: 'application/json' },\n};\n\nreturn [{ json: { ...m, categorie, body_json: JSON.stringify(body) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        288
+      ],
+      "id": "548d6071-e693-406a-b127-2fcaef4bfaeb",
+      "name": "Prepara"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.esito }}",
+                    "rightValue": "scarta",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "02baf3c6-2339-4def-a33e-1ac7219fb009"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "49ab2189-183a-4dc4-8a62-510587c505a0",
+                    "leftValue": "={{ $json.esito }}",
+                    "rightValue": "scrivi",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "23dafe02-d282-46eb-a685-e0087eb1c3f5",
+                    "leftValue": "={{ $json.esito }}",
+                    "rightValue": "riconcilia",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1504,
+        272
+      ],
+      "id": "2a591f94-c828-4ef1-8788-b22fa722fc32",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_CATEGORY",
+          "mode": "list",
+          "cachedResultName": "Category",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -64,
+        288
+      ],
+      "id": "fcde9ad1-f315-4502-9287-89d22f5ab771",
+      "name": "Leggi Categorie",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1056,
+        288
+      ],
+      "id": "32919f9c-ee72-447d-96ac-3bd6378a1929",
+      "name": "Leggi recenti",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data_evento": "={{ $json.riga.data_evento }}",
+            "data_inserimento": "={{ $json.riga.data_inserimento }}",
+            "fonte": "={{ $json.riga.fonte }}",
+            "tipo": "={{ $json.riga.tipo }}",
+            "importo": "={{ $json.riga.importo }}",
+            "valuta": "={{ $json.riga.valuta }}",
+            "conto": "={{ $json.riga.conto }}",
+            "esercente": "={{ $json.riga.esercente }}",
+            "categoria": "={{ $json.riga.categoria }}",
+            "sottocategoria": "={{ $json.riga.sottocategoria }}",
+            "note": "={{ $json.riga.note }}",
+            "testo_grezzo": "={{ $json.riga.testo_grezzo }}",
+            "hash_dedup": "={{ $json.riga.hash_dedup }}",
+            "stato": "={{ $json.riga.stato }}",
+            "confidenza": "={{ $json.riga.confidenza }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1728,
+        288
+      ],
+      "id": "6a931be4-de2b-47ed-8177-d13a2a64a405",
+      "name": "Scrivi transazione",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "DATATABLE_TRANSACTIONS",
+          "mode": "list",
+          "cachedResultName": "Transactions",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "hash_dedup",
+              "keyValue": "={{ $json.chiave }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "importo": "={{ $json.riga.importo }}",
+            "data_evento": "={{ $json.riga.data_evento }}",
+            "data_inserimento": "={{ $json.riga.data_inserimento }}",
+            "fonte": "={{ $json.riga.fonte }}",
+            "conto": "={{ $json.riga.conto }}",
+            "confidenza": 1,
+            "stato": "confermata"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1728,
+        480
+      ],
+      "id": "d860549f-7384-4aee-b930-95c8b26c84c8",
+      "name": "Update row(s)",
+      "alwaysOutputData": false,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "beloXwMTxcj50rGi",
+          "mode": "list",
+          "cachedResultName": "log",
+          "cachedResultUrl": "/projects/PROJECT_ID/datatables/beloXwMTxcj50rGi"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "livello": "duplicato",
+            "messaggio": "={{ $json.motivo }} — {{ $json.riga.importo }} € {{ $json.riga.esercente }} ({{ $json.riga.fonte }})"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "livello",
+              "displayName": "livello",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "messaggio",
+              "displayName": "messaggio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1728,
+        96
+      ],
+      "id": "93f03ec7-0939-477d-b8b0-113c51447ba7",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "chatId": "369010791",
+        "text": "={{ $('Controlla duplicati').first().json.payload_json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2032,
+        288
+      ],
+      "id": "341bf1c4-757f-4d64-a226-6ee7400b7704",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Estrattori",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estrattori": {
+      "main": [
+        [
+          {
+            "node": "Leggi Categorie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serve AI?": {
+      "main": [
+        [
+          {
+            "node": "Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Componi riga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "main": [
+        [
+          {
+            "node": "Componi riga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi riga": {
+      "main": [
+        [
+          {
+            "node": "Leggi recenti",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Controlla duplicati": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara": {
+      "main": [
+        [
+          {
+            "node": "Serve AI?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Scrivi transazione",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Categorie": {
+      "main": [
+        [
+          {
+            "node": "Prepara",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi recenti": {
+      "main": [
+        [
+          {
+            "node": "Controlla duplicati",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrivi transazione": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row(s)": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "WF_GUARDIANO",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "d2b406e2-b6ce-4d71-84f2-1c97bd7063cc",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "WF_PROCESSA_DATI",
+  "tags": []
+}
