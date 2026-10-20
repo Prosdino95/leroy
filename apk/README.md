@@ -17,7 +17,20 @@ caso:
   login, l'app lo segnala invece di ricevere una pagina HTML;
 - l'API può stare su un dominio diverso da quello dell'app (che nell'APK è
   `https://localhost`);
-- il service worker non viene registrato.
+- il service worker non viene registrato;
+- il tasto Indietro di Android (plugin `@capacitor/app`) chiude un livello
+  alla volta: foglio aperto, modifica della connessione, impostazioni,
+  modifica budget, vista Movimenti. Dal Riepilogo manda l'app in background;
+- sblocco con impronta (plugin `@capgo/capacitor-native-biometric`), da
+  attivare nelle impostazioni: all'apertura e dopo un minuto in background
+  l'app chiede l'impronta, con il PIN del telefono come alternativa;
+- l'app resta in verticale, come la PWA;
+- una vibrazione breve (plugin `@capacitor/haptics`) conferma i salvataggi,
+  la scelta di una categoria e la soglia del trascina per aggiornare.
+
+`MainActivity` disattiva l'effetto elastico del WebView sul bordo (Android
+12+), che altrimenti allungherebbe tutta la pagina durante il trascina per
+aggiornare.
 
 Nel browser il comportamento è identico a prima.
 

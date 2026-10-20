@@ -18,6 +18,12 @@
   --accento:   #14161a;
   --accento-t: #ffffff;
   --raggio:    10px;
+
+  /* Margini di sistema. Nell'APK Capacitor li inietta come variabili (i
+     WebView più vecchi non conoscono env()); nel browser vale env(). */
+  --sa-top:    var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sa-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --h-tabbar:  64px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -44,6 +50,9 @@
 [hidden] { display: none !important; }
 
 html, body { height: 100%; }
+/* Niente effetto elastico di Android sul bordo: allungherebbe tutta la
+   pagina, barra in basso compresa, mentre si trascina per aggiornare. */
+html { overscroll-behavior-y: none; }
 
 body {
   margin: 0;
@@ -78,15 +87,7 @@ button { font: inherit; color: inherit; }
   z-index: 20;
   background: var(--bg);
   border-bottom: 1px solid var(--bordo);
-  padding-top: env(safe-area-inset-top);
-}
-
-.barra-alta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 0;
+  padding-top: var(--sa-top);
 }
 
 .barra-azioni { display: flex; gap: 2px; }
@@ -137,43 +138,36 @@ button { font: inherit; color: inherit; }
 .periodo {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding-bottom: 4px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
 }
 .periodo-lab {
-  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
   min-height: 44px;
+  margin-left: -8px;
+  padding: 0 8px;
   border: 0;
   background: none;
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -.01em;
+  font-size: 1.375rem;
+  font-weight: 650;
+  letter-spacing: -.02em;
   cursor: pointer;
   border-radius: var(--raggio);
 }
+.periodo-lab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.periodo-lab svg { flex: none; width: 18px; height: 18px; color: var(--testo-3); }
 .periodo-lab:active { background: var(--bg-alt); }
 
-/* tabs */
-.tabs { display: flex; gap: 4px; }
-.tab {
-  flex: 1;
-  min-height: 44px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: var(--testo-2);
-  font-size: .9375rem;
-  cursor: pointer;
-}
-.tab[aria-selected="true"] {
-  color: var(--testo);
-  font-weight: 600;
-  border-bottom-color: var(--accento);
-}
+#tipoSel { display: flex; width: 100%; }
+#tipoSel .seg { flex: 1; font-size: 1rem; }
 
 /* ---------- contenuto ---------- */
 
-.main { flex: 1; padding: 16px 0 96px; }
+.main { flex: 1; padding: 16px 0 calc(var(--h-tabbar) + var(--sa-bottom) + 24px); }
 .main > .wrap { display: flex; flex-direction: column; }
 
 .etichetta {
@@ -382,11 +376,18 @@ button { font: inherit; color: inherit; }
 .cat.statica { cursor: default; }
 .cat-top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
-.cat-nome { font-size: 1rem; font-weight: 500; }
+.cat-nome {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
 .cat-imp {
   font-size: 1.0625rem;
   font-weight: 600;
@@ -556,6 +557,58 @@ input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
 }
 .mov-imp.entrata { color: var(--verde); }
 
+/* ---------- icone delle categorie ---------- */
+
+.cat-tile {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  color: var(--t);
+  background: color-mix(in srgb, var(--t) 15%, transparent);
+  font-size: .9375rem;
+  font-weight: 650;
+}
+.cat-tile svg { width: 20px; height: 20px; }
+.cat-tile.piccola { width: 28px; height: 28px; border-radius: 8px; font-size: .8125rem; }
+.cat-tile.piccola svg { width: 16px; height: 16px; }
+.tinta-0 { --t: #4f8ef7; }
+.tinta-1 { --t: #22a99a; }
+.tinta-2 { --t: #43a865; }
+.tinta-3 { --t: #d99a22; }
+.tinta-4 { --t: #e9753a; }
+.tinta-5 { --t: #e0584a; }
+.tinta-6 { --t: #d156a0; }
+.tinta-7 { --t: #8b6cf0; }
+
+/* griglia del foglio inserimento */
+.cat-griglia { display: flex; flex-wrap: wrap; gap: 8px; }
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px 0 6px;
+  border: 1px solid var(--bordo-2);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--testo);
+  font: inherit;
+  font-size: .875rem;
+  cursor: pointer;
+}
+.cat-chip .cat-tile.piccola { width: 26px; height: 26px; border-radius: 50%; }
+.cat-chip[aria-checked="true"] {
+  border-color: var(--accento);
+  background: var(--accento);
+  color: var(--accento-t);
+  font-weight: 600;
+}
+.cat-chip.altre { padding: 0 14px; color: var(--testo-2); border-style: dashed; }
+
 /* ---------- stati ---------- */
 
 .vuoto {
@@ -630,27 +683,81 @@ input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
 .btn.testo { border: 0; background: none; color: var(--testo-2); padding: 0 10px; }
 .btn.pericolo { border-color: var(--bordo-2); color: var(--rosso); width: 100%; }
 
-.fab {
+
+/* ---------- barra in basso ---------- */
+
+.tabbar {
   position: fixed;
-  right: 16px;
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  z-index: 25;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 26;
+  display: flex;
+  justify-content: center;
+  padding-bottom: var(--sa-bottom);
+  background: var(--bg);
+  border-top: 1px solid var(--bordo);
+}
+.tabbar-btn {
+  flex: 1;
+  max-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: var(--h-tabbar);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--testo-3);
+  font-size: .6875rem;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tabbar-ico {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 56px;
-  height: 56px;
-  border: 0;
-  border-radius: 28px;
-  background: var(--accento);
-  color: var(--accento-t);
-  cursor: pointer;
+  height: 30px;
+  border-radius: 999px;
+  transition: background-color .15s ease;
 }
-.fab svg { width: 26px; height: 26px; }
-.fab:disabled { opacity: .35; }
-@media (min-width: 592px) {
-  .fab { right: calc(50% - 280px + 16px); }
+.tabbar-ico svg { width: 22px; height: 22px; }
+.tabbar-btn[aria-current="page"] { color: var(--testo); font-weight: 600; }
+.tabbar-btn[aria-current="page"] .tabbar-ico { background: var(--bg-alt); }
+.tabbar-add { color: var(--testo-2); }
+.tabbar-add .tabbar-ico { background: var(--accento); color: var(--accento-t); }
+.tabbar-btn:disabled { opacity: .35; }
+
+/* ---------- trascina per aggiornare ---------- */
+
+.ptr {
+  position: fixed;
+  top: calc(var(--sa-top) + 60px);
+  left: 50%;
+  z-index: 19; /* sotto la topbar: l'indicatore ne esce scendendo */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px;
+  border: 1px solid var(--bordo);
+  border-radius: 50%;
+  background: var(--bg-alt);
+  color: var(--testo-3);
+  opacity: 0;
+  transform: translateY(-48px);
+  pointer-events: none;
 }
+.ptr svg { width: 20px; height: 20px; }
+.ptr.pronto { color: var(--testo); }
+.ptr.rilascio { transition: transform .2s ease, opacity .2s ease; }
+.ptr.gira svg { animation: gira .8s linear infinite; }
+@keyframes gira { to { transform: rotate(360deg); } }
 
 /* ---------- campi ---------- */
 
@@ -701,8 +808,10 @@ input:focus-visible, select:focus-visible, button:focus-visible {
   z-index: 40;
   background: var(--bg);
   overflow-y: auto;
-  padding: calc(8px + env(safe-area-inset-top)) 0 calc(24px + env(safe-area-inset-bottom));
+  padding: calc(8px + var(--sa-top)) 0 calc(24px + var(--sa-bottom));
 }
+/* Con la barra in basso visibile le impostazioni si fermano sopra di essa. */
+body.con-tabbar .schermata { bottom: calc(var(--h-tabbar) + var(--sa-bottom)); }
 .schermata-head {
   display: flex;
   align-items: center;
@@ -756,6 +865,55 @@ input:focus-visible, select:focus-visible, button:focus-visible {
 .cfg-righe dt { color: var(--testo-2); }
 .cfg-righe dd { text-align: right; font-variant-numeric: tabular-nums; }
 
+.cfg-sicurezza { margin-top: 16px; }
+.cfg-interruttore { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+
+/* interruttore acceso/spento (role="switch") */
+.interruttore {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid var(--bordo-2);
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.interruttore::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--testo-3);
+  transition: transform .15s ease, background-color .15s ease;
+}
+.interruttore[aria-checked="true"] { border-color: var(--verde); background: var(--verde); }
+.interruttore[aria-checked="true"]::after { transform: translateX(20px); background: #ffffff; }
+.interruttore:disabled { opacity: .5; }
+
+/* ---------- schermata di blocco ---------- */
+
+.blocco {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: var(--sa-top) 32px var(--sa-bottom);
+  background: var(--bg);
+}
+.blocco h1 { font-size: 1.25rem; font-weight: 650; letter-spacing: -.01em; }
+.blocco .btn.primario { width: auto; min-width: 180px; gap: 8px; margin-top: 16px; }
+.blocco .btn svg { width: 20px; height: 20px; }
+
 #formConfig { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .cfg-gruppo-tit {
   margin: 12px 2px 0;
@@ -808,7 +966,7 @@ input:focus-visible, select:focus-visible, button:focus-visible {
   border-radius: 16px 16px 0 0;
   transform: translateY(100%);
   transition: transform .22s ease;
-  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  padding-bottom: calc(16px + var(--sa-bottom));
 }
 .foglio.aperto { transform: translateY(0); }
 @media (prefers-reduced-motion: reduce) {
@@ -876,7 +1034,7 @@ input:focus-visible, select:focus-visible, button:focus-visible {
   position: fixed;
   left: 16px;
   right: 16px;
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: calc(var(--h-tabbar) + var(--sa-bottom) + 12px);
   z-index: 50;
   max-width: 528px;
   margin: 0 auto;

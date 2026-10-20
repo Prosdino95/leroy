@@ -3,7 +3,7 @@
    Parla solo con l'API descritta nella specifica: un unico POST con
    header x-push-token e campo "azione" come router. */
 
-const VERSIONE = '1.7.0';
+const VERSIONE = '1.10.0';
 const TIMEOUT_MS = 15000;
 
 const CHIAVI = {
@@ -12,6 +12,8 @@ const CHIAVI = {
   accessId: 'finanze.access_id',
   accessSecret: 'finanze.access_secret',
   periodo: 'finanze.periodo',
+  usoCategorie: 'finanze.uso_categorie',
+  impronta: 'finanze.blocco_impronta',
   privacy: 'finanze.privacy',
 };
 
@@ -44,6 +46,75 @@ function svgIcona(nome, classe = 'ico') {
   s.className = classe;
   s.innerHTML = markup;
   return s;
+}
+
+/* Icone delle categorie, per nome in minuscolo. Come ICONE sono costanti
+   chiuse: dall'API arriva solo la chiave, mai il markup. Una categoria
+   sconosciuta mostra la propria iniziale. */
+const CAT_ICONE = {
+  'affitto': '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',
+  'gestione casa': '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M9.5 14.5l2 2 3.5-4"/>',
+  'vacanze': '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
+  'spese oggetti': '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  'supermercato': '<path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/>',
+  'salute': '<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>',
+  'bollette': '<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>',
+  'ristorante': '<path d="M7 3v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M9 12v9"/><path d="M17 3c-1.7 1.5-2.5 3.7-2.5 6.5 0 1.4.9 2.5 2.5 2.5V21"/>',
+  'regali': '<path d="M4 11h16v9H4zM3 7.5h18V11H3zM12 7.5V20"/><path d="M12 7.5C10.5 4 7 4 7.2 6.2c.1 1.3 2.4 1.3 4.8 1.3M12 7.5C13.5 4 17 4 16.8 6.2c-.1 1.3-2.4 1.3-4.8 1.3"/>',
+  'tempo libero': '<path d="M12 3.5l2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 16.4l-5.1 2.8L8 13.5l-4.3-4 5.8-.7z"/>',
+  'benzina': '<path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3.5 21h13M7.5 8h5"/><path d="M15 9l3 3v6a1.5 1.5 0 0 0 3 0v-8l-3-3"/>',
+  'auto': '<path d="M5 16V12l2-5h10l2 5v4z"/><path d="M5 16v2.5M19 16v2.5M4 12h16"/><circle cx="8" cy="14" r=".6"/><circle cx="16" cy="14" r=".6"/>',
+  'teatro': '<path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M14 7v10" stroke-dasharray="2 2"/>',
+  'abbonamenti streaming': '<path d="M3 5h18v12H3zM8 21h8"/><path d="M10 8.5v5l4.5-2.5z"/>',
+  'lavoro': '<path d="M3 8h18v11H3zM8 8V5h8v3M3 13h18"/>',
+  'videogiochi': '<path d="M7 8h10a5 5 0 0 1 0 10c-1.6 0-2.5-.9-3.2-2h-3.6C9.5 17.1 8.6 18 7 18A5 5 0 0 1 7 8z"/><path d="M8 11v3.5M6.25 12.75h3.5M15.5 12h.01M17.5 14h.01"/>',
+  'trasporti': '<path d="M6 4h12v12H6zM6 11h12"/><path d="M8.5 19 7 21M15.5 19l1.5 2M9 13.5h.01M15 13.5h.01"/>',
+  'tasse': '<path d="M7 3h8l4 4v14H7z"/><path d="M10 16l4-6M10 10.5h.01M14 15.5h.01"/>',
+  'multe': '<path d="M12 4.2 21 19.4H3z"/><path d="M12 10v4.1M12 16.9v.01"/>',
+  'telefono': '<path d="M8 3h8v18H8z"/><path d="M11 18h2"/>',
+  'stipendio': '<path d="M3 7h16a2 2 0 0 1 2 2v10H3z"/><path d="M3 7l12-3v3"/><path d="M17 13.5h.01"/>',
+  'bonifici': '<path d="M4 8h15l-3-3M20 16H5l3 3"/>',
+  'rimborsi': '<path d="M9 13 4 8l5-5"/><path d="M4 8h10a6 6 0 0 1 0 12h-3"/>',
+};
+
+/* Otto tinte, scelte per leggersi sia su chiaro sia su scuro. La tinta
+   dipende dal nome: la stessa categoria ha sempre lo stesso colore. */
+function tintaCategoria(chiave) {
+  let h = 0;
+  for (const c of chiave) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h % 8;
+}
+
+function tileCategoria(nome, piccola = false) {
+  const k = String(nome || '').trim().toLowerCase();
+  const t = el('span', {
+    class: `cat-tile tinta-${tintaCategoria(k)}` + (piccola ? ' piccola' : ''),
+    'aria-hidden': 'true',
+  });
+  if (CAT_ICONE[k]) {
+    t.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${CAT_ICONE[k]}</svg>`;
+  } else {
+    t.textContent = k.charAt(0).toUpperCase() || '?';
+  }
+  return t;
+}
+
+/* Gli esercenti arrivano spesso tutti in minuscolo dalle notifiche
+   ("carrefour express"): solo in quel caso si mette la maiuscola a ogni
+   parola. Un testo già scritto con le maiuscole resta com'è. */
+function etichettaBella(testo) {
+  const t = String(testo || '').trim();
+  if (t !== t.toLowerCase()) return t;
+  return t.replace(/(^|[\s(\-/])(\p{L})/gu, (_, prima, lettera) => prima + lettera.toUpperCase());
+}
+
+/* Vibrazione breve, solo nell'APK: 'ok' a operazione riuscita, 'tocco'
+   come conferma leggera di un gesto. */
+function vibra(tipo = 'tocco') {
+  const h = NATIVA && window.Capacitor.Plugins.Haptics;
+  if (!h) return;
+  const p = tipo === 'ok' ? h.notification({ type: 'SUCCESS' }) : h.impact({ style: 'LIGHT' });
+  if (p && p.catch) p.catch(() => { /* non bloccante */ });
 }
 
 function el(tag, attr, ...figli) {
@@ -156,6 +227,7 @@ const stato = {
   riep: null, rStato: 'idle', rErrore: '',
   config: null,
   budgetMode: false,
+  insCatTutte: false, // griglia categorie del foglio inserimento aperta tutta
   and: null,        // serie a 12 mesi: non dipende dal periodo selezionato
 
   mov: null, mStato: 'idle', mErrore: '', mScaduto: true,
@@ -359,7 +431,6 @@ function apriConfig(messaggio = '') {
   const primaVolta = !(stato.cfg.url && stato.cfg.token);
   $('#cfgHead').hidden = primaVolta;
   $('#cfgIntro').hidden = !primaVolta;
-  $('#cfgChiudi').hidden = primaVolta;
   $('#cfgCancella').hidden = primaVolta;
   $('#cfgSalva').textContent = primaVolta ? 'Collega' : 'Salva';
 
@@ -372,6 +443,7 @@ function apriConfig(messaggio = '') {
   chiudiFogli();
   $('#schermataConfig').hidden = false;
   $('#app').hidden = true;
+  aggiornaTabbar();
 }
 
 function vistaConfig(modifica) {
@@ -394,6 +466,7 @@ function vistaConfig(modifica) {
   } else {
     aggiornaSchedaStato();
   }
+  aggiornaSchedaSicurezza();
 }
 
 const STATI_CONNESSIONE = {
@@ -419,6 +492,7 @@ function aggiornaSchedaStato() {
 function chiudiConfig() {
   $('#schermataConfig').hidden = true;
   $('#app').hidden = false;
+  aggiornaTabbar();
 }
 
 function gestisciAuth(err) {
@@ -515,8 +589,13 @@ function inCaricamento() {
   return stato.rStato === 'loading' || stato.mStato === 'loading';
 }
 
+/* Chiamata a ogni inizio e fine caricamento: a lavoro finito ritira
+   l'indicatore del trascina-per-aggiornare, se era rimasto a girare. */
 function aggiornaAggiorna() {
-  $('#btnAggiorna').disabled = inCaricamento();
+  if (!inCaricamento() && ptr.attesa) {
+    ptr.attesa = false;
+    ritiraPtr();
+  }
 }
 
 function aggiornaTutto() {
@@ -536,7 +615,8 @@ function aggiornaManuale() {
 /* ============ barra del periodo ============ */
 
 function aggiornaBarra() {
-  $('#periodoLabel').textContent = periodoEtichetta();
+  const testo = periodoEtichetta();
+  $('#periodoTesto').textContent = testo.charAt(0).toUpperCase() + testo.slice(1);
   for (const b of $$('#tipoSel .seg')) {
     b.classList.toggle('attivo', b.dataset.tipo === stato.tipo);
   }
@@ -592,11 +672,221 @@ function mostraVista(vista) {
   stato.vista = vista;
   $('#vistaRiepilogo').hidden = vista !== 'riepilogo';
   $('#vistaMovimenti').hidden = vista !== 'movimenti';
-  for (const t of $$('#tabs .tab')) {
-    t.setAttribute('aria-selected', String(t.dataset.vista === vista));
-  }
+  aggiornaTabbar();
   if (vista === 'movimenti' && stato.ric.q === '' && (stato.mScaduto || stato.mov === null)) caricaMovimenti();
   window.scrollTo({ top: 0 });
+}
+
+/* La barra in basso esiste solo a configurazione fatta. La voce attiva è
+   Impostazioni finché quella schermata è aperta, altrimenti la vista. */
+function aggiornaTabbar() {
+  const visibile = !!(stato.cfg.url && stato.cfg.token);
+  $('#tabbar').hidden = !visibile;
+  document.body.classList.toggle('con-tabbar', visibile);
+  const attiva = $('#schermataConfig').hidden ? stato.vista : 'impostazioni';
+  for (const b of $$('#tabbar [data-vista]')) {
+    if (b.dataset.vista === attiva) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  }
+}
+
+function vaiAVista(vista) {
+  if (vista === 'impostazioni') {
+    if ($('#schermataConfig').hidden) apriConfig();
+    return;
+  }
+  if (!$('#schermataConfig').hidden) chiudiConfig();
+  if (vista === stato.vista) window.scrollTo({ top: 0, behavior: 'smooth' });
+  else mostraVista(vista);
+}
+
+/* ---------- trascina per aggiornare ---------- */
+
+const PTR_SOGLIA = 56;
+const ptr = { y0: null, d: 0, attesa: false };
+
+function ptrAttivo() {
+  return window.scrollY <= 0
+    && $('#schermataConfig').hidden
+    && $('#blocco').hidden
+    && !document.body.classList.contains('bloccato')
+    && !ptr.attesa;
+}
+
+function ritiraPtr() {
+  const i = $('#ptr');
+  i.classList.add('rilascio');
+  i.classList.remove('pronto', 'gira');
+  i.style.transform = '';
+  i.style.opacity = '';
+}
+
+function collegaPtr() {
+  const i = $('#ptr');
+  document.addEventListener('touchstart', ev => {
+    ptr.y0 = (ev.touches.length === 1 && ptrAttivo()) ? ev.touches[0].clientY : null;
+    ptr.d = 0;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', ev => {
+    if (ptr.y0 === null) return;
+    // Resistenza: l'indicatore fa poco più di metà della strada del dito.
+    const d = Math.max(0, Math.min((ev.touches[0].clientY - ptr.y0) * 0.6, 96));
+    ptr.d = d;
+    i.classList.remove('rilascio');
+    if (d >= PTR_SOGLIA && !i.classList.contains('pronto')) vibra();
+    i.classList.toggle('pronto', d >= PTR_SOGLIA);
+    i.style.transform = `translateY(${d - 48}px) rotate(${d * 4}deg)`;
+    i.style.opacity = String(Math.min(1, d / PTR_SOGLIA));
+  }, { passive: true });
+
+  const fine = () => {
+    if (ptr.y0 === null) return;
+    ptr.y0 = null;
+    if (ptr.d >= PTR_SOGLIA) {
+      ptr.attesa = true;
+      i.classList.add('rilascio', 'gira');
+      i.style.transform = `translateY(${PTR_SOGLIA - 48}px)`;
+      i.style.opacity = '1';
+      aggiornaManuale();
+      aggiornaAggiorna(); // se non è partito nulla, ritira subito
+    } else {
+      ritiraPtr();
+    }
+  };
+  document.addEventListener('touchend', fine);
+  document.addEventListener('touchcancel', fine);
+}
+
+/* ---------- sblocco con impronta (solo APK) ---------- */
+
+const GRAZIA_BLOCCO_MS = 60_000;
+// Tipi del plugin NativeBiometric: impronta e credenziale del dispositivo.
+// Con la seconda il dialogo di sistema offre anche il PIN come alternativa.
+const TIPI_SBLOCCO = [3, 7];
+
+const blocco = {
+  disponibile: false, // il telefono ha un'impronta o un PIN utilizzabile
+  inCorso: false,     // dialogo di sistema aperto: mette l'app in pausa
+  uscita: 0,          // quando l'app è andata in background
+};
+
+function improntaAttiva() {
+  try { return NATIVA && localStorage.getItem(CHIAVI.impronta) === '1'; } catch { return false; }
+}
+
+function biometria() {
+  return NATIVA ? window.Capacitor.Plugins.NativeBiometric : null;
+}
+
+/* Risolve true se l'utente è stato riconosciuto. */
+async function verificaImpronta() {
+  const b = biometria();
+  if (!b || blocco.inCorso) return false;
+  blocco.inCorso = true;
+  try {
+    await b.verifyIdentity({
+      title: 'Sblocca Leroy',
+      subtitle: 'Usa l\'impronta o il PIN del telefono',
+      allowedBiometryTypes: TIPI_SBLOCCO,
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    blocco.inCorso = false;
+  }
+}
+
+async function chiediSblocco() {
+  if (await verificaImpronta()) {
+    $('#blocco').hidden = true;
+  }
+}
+
+function bloccaApp() {
+  if (!improntaAttiva()) return;
+  chiudiFogli();
+  $('#blocco').hidden = false;
+  chiediSblocco();
+}
+
+/* In background il contenuto si copre subito, così al rientro non compare
+   nemmeno per un attimo. Al rientro si chiede l'impronta solo se l'app è
+   rimasta via oltre il periodo di grazia. Le pause causate dal dialogo
+   dell'impronta stesso non contano. */
+function cambioStatoApp({ isActive }) {
+  if (!improntaAttiva() || blocco.inCorso) return;
+  if (!isActive) {
+    blocco.uscita = Date.now();
+    $('#blocco').hidden = false;
+    return;
+  }
+  if ($('#blocco').hidden) return;
+  if (blocco.uscita && Date.now() - blocco.uscita < GRAZIA_BLOCCO_MS) {
+    $('#blocco').hidden = true;
+  } else {
+    chiediSblocco();
+  }
+}
+
+async function preparaImpronta() {
+  const b = biometria();
+  if (!b) return;
+  try {
+    const r = await b.isAvailable({ useFallback: true });
+    blocco.disponibile = !!(r && (r.isAvailable || r.deviceIsSecure));
+  } catch {
+    blocco.disponibile = false;
+  }
+  aggiornaSchedaSicurezza();
+}
+
+function aggiornaSchedaSicurezza() {
+  $('#cfgSicurezza').hidden = !(NATIVA && blocco.disponibile) || !$('#formConfig').hidden;
+  $('#cfgImpronta').setAttribute('aria-checked', String(improntaAttiva()));
+}
+
+/* Per attivarlo serve un'impronta riuscita: così non ci si chiude fuori
+   con un sensore che non funziona. Per disattivarlo basta il tocco. */
+async function cambiaImpronta() {
+  const btn = $('#cfgImpronta');
+  if (improntaAttiva()) {
+    try { localStorage.removeItem(CHIAVI.impronta); } catch { /* non bloccante */ }
+    toast('Sblocco con impronta disattivato.');
+  } else {
+    btn.disabled = true;
+    const ok = await verificaImpronta();
+    btn.disabled = false;
+    if (!ok) { toast('Impronta non verificata: sblocco non attivato.', 'errore'); return; }
+    try { localStorage.setItem(CHIAVI.impronta, '1'); } catch { /* non bloccante */ }
+    vibra('ok');
+    toast('Sblocco con impronta attivato.');
+  }
+  aggiornaSchedaSicurezza();
+}
+
+/* ---------- tasto Indietro (solo APK) ---------- */
+
+/* Chiude ciò che è aperto, un livello alla volta. Dalla vista principale
+   l'app va in background, come le altre app Android, invece di chiudersi. */
+function indietro() {
+  if (!$('#blocco').hidden) { window.Capacitor.Plugins.App.minimizeApp(); return; }
+  if ($$('.foglio').some(f => f.classList.contains('aperto'))) { chiudiFogli(); return; }
+
+  const configurato = !!(stato.cfg.url && stato.cfg.token);
+  if (!$('#schermataConfig').hidden && configurato) {
+    if (!$('#formConfig').hidden) {
+      $('#cfgAvviso').hidden = true;
+      vistaConfig(false);
+    } else {
+      chiudiConfig();
+    }
+    return;
+  }
+  if (configurato && stato.budgetMode) { stato.budgetMode = false; renderRiepilogo(); return; }
+  if (configurato && stato.vista !== 'riepilogo') { mostraVista('riepilogo'); return; }
+  window.Capacitor.Plugins.App.minimizeApp();
 }
 
 function scheletro(righe) {
@@ -700,7 +990,7 @@ function renderRiepilogo() {
       el('div', { class: 'sezione-head' }, el('h2', { text: 'Entrate' })),
       el('div', { class: 'cat-lista' }, entrate.map(c => el('div', { class: 'cat statica' },
         el('div', { class: 'cat-top' },
-          el('span', { class: 'cat-nome', text: c.nome }),
+          el('span', { class: 'cat-nome' }, tileCategoria(c.nome, true), c.nome),
           el('span', { class: 'cat-imp positivo', text: eur(c.speso) })))))));
   }
 
@@ -792,7 +1082,7 @@ function sezioneAttese(attese, totale) {
       el('span', { class: 'sezione-tot', text: eur(somma) })),
     el('div', { class: 'attese-lista' }, ordinate.map(a => {
       const inRitardo = !!a.data && a.data < oggi;
-      const titolo = (a.etichetta && String(a.etichetta).trim()) || a.categoria || '(senza descrizione)';
+      const titolo = etichettaBella(a.etichetta) || a.categoria || '(senza descrizione)';
 
       const tit = el('span', { class: 'attesa-tit' });
       if (inRitardo) tit.append(svgIcona('avviso'));
@@ -811,6 +1101,7 @@ function sezioneAttese(attese, totale) {
         type: 'button',
         onclick: () => apriDettaglio(a, true),
       },
+        tileCategoria(a.categoria),
         el('span', { class: 'attesa-main' }, tit, sub),
         el('span', { class: 'attesa-imp', text: eur(a.importo) }));
     })));
@@ -821,7 +1112,7 @@ function rigaSpesa(c) {
   const budget = num(c.budget);
 
   const top = el('div', { class: 'cat-top' },
-    el('span', { class: 'cat-nome', text: c.nome }),
+    el('span', { class: 'cat-nome' }, tileCategoria(c.nome, true), c.nome),
     el('span', { class: 'cat-imp', text: eur(speso) }));
 
   if (stato.budgetMode) {
@@ -897,6 +1188,7 @@ async function salvaBudget() {
     const d = await api('budget', { valori });
     const n = Number.isFinite(Number(d.aggiornate)) ? Number(d.aggiornate) : quante;
     stato.budgetMode = false;
+    vibra('ok');
     toast(`Budget aggiornato: ${n} ${n === 1 ? 'categoria' : 'categorie'}.`);
     caricaRiepilogo();
   } catch (err) {
@@ -1088,7 +1380,7 @@ function chip(testo, rimuovi) {
 function rigaMovimento(m) {
   const entrata = m.tipo === 'entrata';
   const daVerificare = m.stato === 'da_verificare';
-  const titolo = (m.etichetta && String(m.etichetta).trim()) || m.categoria || '(senza descrizione)';
+  const titolo = etichettaBella(m.etichetta) || m.categoria || '(senza descrizione)';
 
   const secondaria = [m.categoria, m.conto].filter(Boolean).join(' · ');
 
@@ -1108,6 +1400,7 @@ function rigaMovimento(m) {
     type: 'button',
     onclick: () => apriDettaglio(m),
   },
+    tileCategoria(m.categoria),
     el('span', { class: 'mov-main' }, tit, sub),
     el('span', {
       class: 'mov-imp' + (entrata ? ' entrata' : ''),
@@ -1265,6 +1558,7 @@ async function confermaMovimento() {
     const nuovoStato = stato.dettAttesa ? 'attesa' : 'confermata';
     await api('correggi', { hash: m.hash, categoria, stato: nuovoStato, importo });
     chiudiFogli();
+    vibra('ok');
     toast(stato.dettAttesa ? 'Addebito previsto aggiornato.' : 'Movimento confermato.');
     ricaricaDopoDettaglio();
   } catch (err) {
@@ -1296,6 +1590,7 @@ async function eliminaMovimento() {
   try {
     await api('elimina', { hash: m.hash });
     chiudiFogli();
+    vibra('ok');
     toast(stato.dettAttesa ? 'Addebito previsto eliminato.' : 'Movimento eliminato.');
     ricaricaDopoDettaglio();
   } catch (err) {
@@ -1322,6 +1617,64 @@ function popolaCategorieIns() {
   for (const nome of categorieDi(tipo)) sel.append(el('option', { value: nome, text: nome }));
   if (precedente && categorieDi(tipo).includes(precedente)) sel.value = precedente;
   else sel.value = '';
+  stato.insCatTutte = false;
+  renderGrigliaCategorie();
+}
+
+const CAT_IN_EVIDENZA = 8;
+
+function leggiUsoCategorie() {
+  try { return JSON.parse(localStorage.getItem(CHIAVI.usoCategorie) || '{}') || {}; } catch { return {}; }
+}
+
+function contaUsoCategoria(nome) {
+  const uso = leggiUsoCategorie();
+  uso[nome] = (Number(uso[nome]) || 0) + 1;
+  try { localStorage.setItem(CHIAVI.usoCategorie, JSON.stringify(uso)); } catch { /* non bloccante */ }
+}
+
+/* Prima le categorie che usi di più da questo dispositivo, poi quelle con
+   più spesa nel periodo aperto, poi l'ordine della configurazione. */
+function categorieOrdinate(tipo) {
+  const uso = leggiUsoCategorie();
+  const speso = {};
+  for (const c of (stato.riep && Array.isArray(stato.riep.categorie)) ? stato.riep.categorie : []) {
+    speso[c.nome] = num(c.speso);
+  }
+  const base = categorieDi(tipo);
+  return base.slice().sort((a, b) =>
+    (Number(uso[b]) || 0) - (Number(uso[a]) || 0)
+    || (speso[b] || 0) - (speso[a] || 0)
+    || base.indexOf(a) - base.indexOf(b));
+}
+
+function renderGrigliaCategorie() {
+  const tipo = $$('#insTipo .seg').find(b => b.classList.contains('attivo')).dataset.tipo;
+  const sel = $('#insCategoria');
+  const tutte = categorieOrdinate(tipo);
+  // Se la categoria scelta sta oltre le prime, la griglia si apre tutta.
+  const aperta = stato.insCatTutte || tutte.indexOf(sel.value) >= CAT_IN_EVIDENZA;
+  const visibili = aperta ? tutte : tutte.slice(0, CAT_IN_EVIDENZA);
+
+  const griglia = $('#insCatGriglia');
+  griglia.replaceChildren(...visibili.map(nome => el('button', {
+    class: 'cat-chip', type: 'button', role: 'radio',
+    'aria-checked': String(sel.value === nome),
+    onclick: () => {
+      sel.value = nome;
+      vibra();
+      renderGrigliaCategorie();
+      validaInserisci();
+    },
+  }, tileCategoria(nome, true), el('span', { text: nome }))));
+
+  if (!aperta && tutte.length > CAT_IN_EVIDENZA) {
+    griglia.append(el('button', {
+      class: 'cat-chip altre', type: 'button',
+      text: `Altre ${tutte.length - CAT_IN_EVIDENZA}`,
+      onclick: () => { stato.insCatTutte = true; renderGrigliaCategorie(); },
+    }));
+  }
 }
 
 function apriInserisci() {
@@ -1385,6 +1738,8 @@ async function inviaInserisci(ev) {
       esercente: $('#insDescrizione').value.trim(),
       note: '',
     });
+    contaUsoCategoria(categoria);
+    vibra('ok');
     chiudiFogli();
     if (d.duplicato_sospetto) {
       toast('Movimento aggiunto. Attenzione: esiste un movimento simile registrato di recente.', 'avviso');
@@ -1451,22 +1806,30 @@ function toast(messaggio, tipo = '') {
 function collegaEventi() {
   $('#tipoSel').addEventListener('click', ev => {
     const b = ev.target.closest('.seg');
-    if (b) cambiaTipo(b.dataset.tipo);
+    if (!b) return;
+    cambiaTipo(b.dataset.tipo);
+    chiudiFogli();
   });
+  $('#btnOggi').addEventListener('click', () => { vaiAOggi(); chiudiFogli(); });
   $('#periodoPrec').addEventListener('click', () => spostaPeriodo(-1));
   $('#periodoSucc').addEventListener('click', () => spostaPeriodo(1));
-  $('#periodoLabel').addEventListener('click', vaiAOggi);
-  $('#btnAggiorna').addEventListener('click', aggiornaManuale);
+  $('#periodoLabel').addEventListener('click', () => apriFoglio('#foglioPeriodo'));
   $('#btnPrivacy').addEventListener('click', cambiaPrivacy);
-  $('#btnImpostazioni').addEventListener('click', () => apriConfig());
+
+  $('#tabbar').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-vista]');
+    if (b) vaiAVista(b.dataset.vista);
+  });
+  collegaPtr();
+  if (NATIVA && window.Capacitor.Plugins.App) {
+    window.Capacitor.Plugins.App.addListener('backButton', indietro);
+    window.Capacitor.Plugins.App.addListener('appStateChange', cambioStatoApp);
+  }
+  $('#cfgImpronta').addEventListener('click', cambiaImpronta);
+  $('#btnSblocca').addEventListener('click', chiediSblocco);
 
   $('#ricercaQ').addEventListener('input', ricercaDigitata);
   $('#ricercaQ').addEventListener('search', ricercaDigitata);   // la "x" nativa del campo
-
-  $('#tabs').addEventListener('click', ev => {
-    const t = ev.target.closest('.tab');
-    if (t) mostraVista(t.dataset.vista);
-  });
 
   $('#fab').addEventListener('click', apriInserisci);
 
@@ -1565,7 +1928,6 @@ function collegaEventi() {
     vistaConfig(false);
   });
 
-  $('#cfgChiudi').addEventListener('click', chiudiConfig);
 
   $('#cfgCancella').addEventListener('click', () => {
     if (!confirm('Cancellare URL e token salvati su questo dispositivo?')) return;
@@ -1592,6 +1954,8 @@ function avvia() {
   aggiornaBottonePrivacy();
   collegaEventi();
   aggiornaFab();
+  bloccaApp();
+  preparaImpronta();
 
   if (!leggiConfig()) {
     apriConfig();
