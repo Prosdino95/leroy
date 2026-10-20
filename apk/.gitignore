@@ -1,2 +1,7 @@
 node_modules/
 www/
+
+# Firma della release: la chiave e i suoi riferimenti non vanno in git
+*.jks
+*.keystore
+keystore.properties

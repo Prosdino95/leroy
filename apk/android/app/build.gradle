@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+// La versione si legge da VERSIONE in app/app.js, l'unica da aggiornare:
+// "1.10.0" diventa versionName 1.10.0 e versionCode 11000.
+def versioneApp = {
+    def m = (rootProject.file('../../app/app.js').text =~ /const VERSIONE = '(\d+)\.(\d+)\.(\d+)'/)
+    if (!m.find()) throw new GradleException("VERSIONE non trovata in app/app.js")
+    def (maj, min, pat) = [m.group(1), m.group(2), m.group(3)].collect { it as int }
+    [nome: "${maj}.${min}.${pat}", codice: maj * 10000 + min * 100 + pat]
+}()
+
+// Firma della release: percorso e alias in keystore.properties (fuori da
+// git), la password solo dalla variabile LEROY_KEYSTORE_PASSWORD, che
+// build-release.sh chiede al momento.
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) keystorePropsFile.withInputStream { keystoreProps.load(it) }
+
 android {
     namespace = "com.prosdino.leroy"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +23,8 @@ android {
         applicationId "com.prosdino.leroy"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode versioneApp.codice
+        versionName versioneApp.nome
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +32,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile file(keystoreProps['storeFile'])
+                keyAlias keystoreProps['keyAlias']
+                storePassword System.getenv('LEROY_KEYSTORE_PASSWORD')
+                keyPassword System.getenv('LEROY_KEYSTORE_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystorePropsFile.exists()) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

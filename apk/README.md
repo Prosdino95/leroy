@@ -69,6 +69,32 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 Dopo ogni modifica a `app/` basta rilanciare `npm run apk`.
 
+La versione Android (`versionName` e `versionCode`) si legge da `VERSIONE` in
+`app/app.js`: basta aggiornare quella.
+
+### Release firmata
+
+La chiave sta fuori dal repository, in `~/.android-keys/leroy.jks` (alias
+`leroy`). `android/keystore.properties`, anch'esso fuori da git, dice dove:
+
+```
+storeFile=/Users/prosdino95/.android-keys/leroy.jks
+keyAlias=leroy
+```
+
+```bash
+npm run apk:release
+```
+
+Lo script chiede la password della chiave e la passa a Gradle solo come
+variabile d'ambiente. L'APK finisce in
+`android/app/build/outputs/apk/release/app-release.apk`.
+
+Senza quella chiave non si possono installare aggiornamenti sopra l'app:
+tienine un backup insieme alla password. Il passaggio da una build di debug
+a una release richiede di disinstallare l'app, e quindi di reinserire la
+configurazione.
+
 ## Primo avvio
 
 Nella schermata di configurazione:

@@ -5,7 +5,8 @@
   "scripts": {
     "www": "node prepara-www.mjs",
     "sync": "npm run www && cap sync android",
-    "apk": "npm run sync && cd android && ./gradlew assembleDebug"
+    "apk": "npm run sync && cd android && ./gradlew assembleDebug",
+    "apk:release": "sh build-release.sh"
   },
   "dependencies": {
     "@capacitor/android": "8.5.3",
