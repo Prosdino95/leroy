@@ -711,7 +711,71 @@ input:focus-visible, select:focus-visible, button:focus-visible {
   margin-bottom: 8px;
 }
 .schermata-head h1 { font-size: 1.375rem; font-weight: 650; letter-spacing: -.02em; }
-#formConfig { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+.cfg-benvenuto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 40px 8px 16px;
+}
+.cfg-logo { width: 72px; height: 72px; margin-bottom: 8px; }
+.cfg-benvenuto h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: -.02em; }
+.cfg-benvenuto p { max-width: 320px; font-size: .9375rem; color: var(--testo-2); }
+
+.cfg-stato {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  background: var(--bg-alt);
+}
+.cfg-stato-head { display: flex; align-items: center; gap: 12px; }
+.cfg-pallino {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--testo-3);
+}
+.cfg-pallino.ok { background: var(--verde); box-shadow: 0 0 0 4px var(--verde-bg); }
+.cfg-pallino.ko { background: var(--rosso); box-shadow: 0 0 0 4px var(--rosso-bg); }
+.cfg-stato-tit { font-weight: 600; }
+.cfg-host { font-size: .875rem; color: var(--testo-2); overflow-wrap: anywhere; }
+.cfg-righe { display: flex; flex-direction: column; border-top: 1px solid var(--bordo); }
+.cfg-righe > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bordo);
+  font-size: .875rem;
+}
+.cfg-righe dt { color: var(--testo-2); }
+.cfg-righe dd { text-align: right; font-variant-numeric: tabular-nums; }
+
+#formConfig { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.cfg-gruppo-tit {
+  margin: 12px 2px 0;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--testo-3);
+}
+.cfg-gruppo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  background: var(--bg-alt);
+}
+.cfg-azioni { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; }
 .schermata-piede { margin-top: 40px; display: flex; flex-direction: column; gap: 16px; }
 .nota { font-size: .8125rem; color: var(--testo-2); }
 .versione { font-size: .8125rem; color: var(--testo-3); text-align: center; }

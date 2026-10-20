@@ -1,0 +1,13 @@
+{
+  "appId": "com.prosdino.leroy",
+  "appName": "Leroy",
+  "webDir": "www",
+  "loggingBehavior": "none",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": false }
+  }
+}

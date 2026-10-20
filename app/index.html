@@ -105,29 +105,78 @@
 <!-- ============ Configurazione / Impostazioni ============ -->
 <div class="schermata" id="schermataConfig" hidden>
   <div class="wrap">
-    <header class="schermata-head">
-      <h1 id="cfgTitolo">Configurazione</h1>
+    <header class="schermata-head" id="cfgHead">
+      <h1 id="cfgTitolo">Impostazioni</h1>
       <button type="button" class="btn testo" id="cfgChiudi" hidden>Chiudi</button>
     </header>
 
+    <!-- Solo al primo avvio, al posto dell'intestazione. -->
+    <div class="cfg-benvenuto" id="cfgIntro" hidden>
+      <svg class="cfg-logo" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112.64" fill="#14161A"/><rect x="158.7" y="128.0" width="66.6" height="256.0" rx="30.7" fill="#F2F0EB"/><rect x="158.7" y="317.4" width="194.6" height="66.6" rx="30.7" fill="#F2F0EB"/><circle cx="317.4" cy="174.1" r="38.4" fill="#39B98A"/></svg>
+      <h1>Collega Leroy</h1>
+      <p>Inserisci l'indirizzo dell'API e il token. Restano salvati solo su questo dispositivo.</p>
+    </div>
+
     <p class="avviso" id="cfgAvviso" hidden></p>
-    <p class="nota" id="cfgIntro">Inserisci l'indirizzo dell'API e il token di accesso. Restano salvati solo su questo dispositivo.</p>
+
+    <!-- Riepilogo della connessione salvata: i campi restano nascosti
+         finché non si sceglie di modificarla. -->
+    <section class="cfg-stato" id="cfgStato" hidden>
+      <div class="cfg-stato-head">
+        <span class="cfg-pallino" id="cfgPallino"></span>
+        <div>
+          <p class="cfg-stato-tit" id="cfgStatoTit"></p>
+          <p class="cfg-host" id="cfgHost"></p>
+        </div>
+      </div>
+      <dl class="cfg-righe">
+        <div><dt>Token</dt><dd id="cfgTokenMask"></dd></div>
+        <div id="cfgRigaAccess"><dt>Cloudflare Access</dt><dd id="cfgAccessStato"></dd></div>
+      </dl>
+      <button type="button" class="btn" id="cfgModifica">Modifica connessione</button>
+    </section>
 
     <form id="formConfig" novalidate>
-      <label class="campo">
-        <span class="campo-lab">URL dell'API</span>
-        <input id="cfgUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false"
-               placeholder="https://esempio.duckdns.org/webhook/api-xxxx" required>
-      </label>
-      <label class="campo">
-        <span class="campo-lab">Token</span>
-        <span class="campo-affiancato">
-          <input id="cfgToken" type="password" autocomplete="off" spellcheck="false" required>
-          <button type="button" class="btn testo" id="cfgVedi">Mostra</button>
-        </span>
-      </label>
+      <h2 class="cfg-gruppo-tit">Server</h2>
+      <div class="cfg-gruppo">
+        <label class="campo">
+          <span class="campo-lab">URL dell'API</span>
+          <input id="cfgUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+                 placeholder="https://esempio.duckdns.org/webhook/api-xxxx" required>
+        </label>
+        <label class="campo">
+          <span class="campo-lab">Token</span>
+          <span class="campo-affiancato">
+            <input id="cfgToken" type="password" autocomplete="off" spellcheck="false" required>
+            <button type="button" class="btn testo" data-vedi="cfgToken">Mostra</button>
+          </span>
+        </label>
+      </div>
+
+      <div id="cfgAccess" hidden>
+        <h2 class="cfg-gruppo-tit">Cloudflare Access</h2>
+        <div class="cfg-gruppo">
+          <p class="nota">Service token. Lascia vuoto se l'API non è dietro Access.</p>
+          <label class="campo">
+            <span class="campo-lab">Client ID</span>
+            <input id="cfgAccessId" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="xxxxxxxx.access">
+          </label>
+          <label class="campo">
+            <span class="campo-lab">Client Secret</span>
+            <span class="campo-affiancato">
+              <input id="cfgAccessSecret" type="password" autocomplete="off" spellcheck="false">
+              <button type="button" class="btn testo" data-vedi="cfgAccessSecret">Mostra</button>
+            </span>
+          </label>
+        </div>
+      </div>
+
       <p class="errore-inline" id="cfgErrore" hidden></p>
-      <button type="submit" class="btn primario">Salva</button>
+      <div class="cfg-azioni">
+        <button type="submit" class="btn primario" id="cfgSalva">Salva</button>
+        <button type="button" class="btn testo" id="cfgAnnulla" hidden>Annulla</button>
+      </div>
     </form>
 
     <div class="schermata-piede">

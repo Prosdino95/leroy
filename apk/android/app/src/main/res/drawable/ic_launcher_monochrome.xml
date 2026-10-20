@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generato da app/icon-512.svg: la "L" e il punto di Leroy. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.1875"
+        android:scaleY="0.1875"
+        android:translateX="6"
+        android:translateY="6">
+        <path android:fillColor="#FFFFFF" android:pathData="M189.4,128.0 h5.2 a30.7,30.7 0 0 1 30.7,30.7 v194.6 a30.7,30.7 0 0 1 -30.7,30.7 h-5.2 a30.7,30.7 0 0 1 -30.7,-30.7 v-194.6 a30.7,30.7 0 0 1 30.7,-30.7 z M189.4,317.4 h133.2 a30.7,30.7 0 0 1 30.7,30.7 v5.2 a30.7,30.7 0 0 1 -30.7,30.7 h-133.2 a30.7,30.7 0 0 1 -30.7,-30.7 v-5.2 a30.7,30.7 0 0 1 30.7,-30.7 z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M279.0,174.1 a38.4,38.4 0 1 0 76.8,0 a38.4,38.4 0 1 0 -76.8,0 z" />
+    </group>
+</vector>

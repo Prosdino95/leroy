@@ -1,0 +1,17 @@
+{
+  "name": "leroy-apk",
+  "private": true,
+  "description": "Guscio Capacitor che impacchetta la PWA di app/ in un APK Android.",
+  "scripts": {
+    "www": "node prepara-www.mjs",
+    "sync": "npm run www && cap sync android",
+    "apk": "npm run sync && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

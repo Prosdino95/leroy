@@ -3,15 +3,23 @@
    Parla solo con l'API descritta nella specifica: un unico POST con
    header x-push-token e campo "azione" come router. */
 
-const VERSIONE = '1.5.0';
+const VERSIONE = '1.7.0';
 const TIMEOUT_MS = 15000;
 
 const CHIAVI = {
   url: 'finanze.api_url',
   token: 'finanze.token',
+  accessId: 'finanze.access_id',
+  accessSecret: 'finanze.access_secret',
   periodo: 'finanze.periodo',
   privacy: 'finanze.privacy',
 };
+
+/* Dentro l'APK (Capacitor) l'app è servita da https://localhost: l'API è su
+   un altro dominio e sta dietro Cloudflare Access. Le chiamate passano allora
+   dal client HTTP nativo, che non subisce CORS e porta il service token di
+   Access negli header. Nel browser resta tutto come prima. */
+const NATIVA = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 
 const RITARDO_RICERCA = 400;
 
@@ -139,7 +147,8 @@ const dataBreve = iso => FMT_BREVE.format(dataLocale(iso));
 /* ============ stato ============ */
 
 const stato = {
-  cfg: { url: '', token: '' },
+  cfg: { url: '', token: '', accessId: '', accessSecret: '' },
+  connessione: null, // null | 'ok' | 'rete' | 'auth': esito dell'ultima chiamata
   tipo: 'mese',
   rif: oggiISO(),
   vista: 'riepilogo',
@@ -199,12 +208,29 @@ class ErroreApi extends Error {
     this.auth = !!extra.auth;
     this.timeout = !!extra.timeout;
     this.annullata = !!extra.annullata;
+    this.rete = !!extra.rete;
+  }
+}
+
+/* Tiene traccia dell'esito dell'ultima chiamata per la scheda di stato nelle
+   impostazioni. Un errore applicativo (dati.ok === false) vuol dire comunque
+   che l'API è stata raggiunta: conta come connessione riuscita. */
+async function api(azione, corpo = {}, segnale = null) {
+  try {
+    const dati = await chiamaApi(azione, corpo, segnale);
+    stato.connessione = 'ok';
+    return dati;
+  } catch (err) {
+    if (err.auth) stato.connessione = 'auth';
+    else if (err.rete || err.timeout) stato.connessione = 'rete';
+    else if (!err.annullata) stato.connessione = 'ok';
+    throw err;
   }
 }
 
 /* segnale: AbortSignal opzionale per annullare dall'esterno una chiamata
    ancora in volo (serve alla ricerca mentre si digita). */
-async function api(azione, corpo = {}, segnale = null) {
+async function chiamaApi(azione, corpo = {}, segnale = null) {
   if (!stato.cfg.url || !stato.cfg.token) {
     throw new ErroreApi('Configurazione mancante: inserisci URL e token.', { auth: true });
   }
@@ -219,15 +245,18 @@ async function api(azione, corpo = {}, segnale = null) {
     else segnale.addEventListener('abort', propaga, { once: true });
   }
 
+  const headers = { 'Content-Type': 'application/json', 'x-push-token': stato.cfg.token };
+  if (stato.cfg.accessId && stato.cfg.accessSecret) {
+    headers['CF-Access-Client-Id'] = stato.cfg.accessId;
+    headers['CF-Access-Client-Secret'] = stato.cfg.accessSecret;
+  }
+  const richiesta = { azione, ...corpo };
+
   let res;
   try {
-    res = await fetch(stato.cfg.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-push-token': stato.cfg.token },
-      body: JSON.stringify({ azione, ...corpo }),
-      signal: ctrl.signal,
-      cache: 'no-store',
-    });
+    res = NATIVA
+      ? await inviaNativa(headers, richiesta, ctrl.signal)
+      : await inviaBrowser(headers, richiesta, ctrl.signal);
   } catch {
     if (segnale && segnale.aborted) {
       throw new ErroreApi('Richiesta annullata.', { annullata: true });
@@ -235,24 +264,32 @@ async function api(azione, corpo = {}, segnale = null) {
     if (scaduto) {
       throw new ErroreApi(`La richiesta ha superato i ${TIMEOUT_MS / 1000} secondi senza risposta.`, { timeout: true });
     }
-    throw new ErroreApi("Impossibile raggiungere l'API. Controlla la rete e l'URL configurato.");
+    throw new ErroreApi("Impossibile raggiungere l'API. Controlla la rete e l'URL configurato.", { rete: true });
   } finally {
     clearTimeout(timer);
     if (segnale) segnale.removeEventListener('abort', propaga);
   }
 
+  // Con le credenziali mancanti o sbagliate Access risponde con un redirect
+  // alla sua pagina di login: il client nativo non lo segue e lo vede qui.
+  if (res.status >= 300 && res.status < 400) {
+    throw new ErroreApi(`Cloudflare Access ha chiesto il login (HTTP ${res.status}). Controlla Client ID e Client Secret.`, { auth: true });
+  }
   if (res.status === 401 || res.status === 403) {
-    throw new ErroreApi(`L'API ha rifiutato il token (HTTP ${res.status}). Controlla URL e token.`, { auth: true });
+    const cosa = NATIVA ? 'token o credenziali Access' : 'token';
+    throw new ErroreApi(`L'API ha rifiutato la richiesta (HTTP ${res.status}). Controlla URL e ${cosa}.`, { auth: true });
   }
 
-  const testo = await res.text();
+  const testo = res.testo;
   let dati = null;
   if (testo.trim() !== '') {
     try { dati = JSON.parse(testo); } catch { dati = null; }
   }
 
-  if (!res.ok) {
-    throw new ErroreApi((dati && dati.errore) || `L'API ha risposto con errore HTTP ${res.status}.`);
+  if (res.status < 200 || res.status >= 300) {
+    // Un 5xx vuol dire che n8n o il proxy non rispondono: per la scheda di
+    // stato è un problema di raggiungibilità, non della richiesta.
+    throw new ErroreApi((dati && dati.errore) || `L'API ha risposto con errore HTTP ${res.status}.`, { rete: res.status >= 500 });
   }
   if (dati === null) {
     throw new ErroreApi("Risposta non leggibile dall'API (JSON non valido).");
@@ -263,31 +300,120 @@ async function api(azione, corpo = {}, segnale = null) {
   return dati;
 }
 
+/* Le due vie di trasporto restituiscono la stessa forma, { status, testo },
+   così api() non deve sapere quale ha usato. */
+async function inviaBrowser(headers, richiesta, segnale) {
+  const res = await fetch(stato.cfg.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(richiesta),
+    signal: segnale,
+    cache: 'no-store',
+  });
+  return { status: res.status, testo: await res.text() };
+}
+
+/* La chiamata nativa non si può interrompere davvero: all'annullamento la
+   promessa viene rifiutata subito e la risposta, se arriva, si ignora. */
+function inviaNativa(headers, richiesta, segnale) {
+  return new Promise((risolvi, rifiuta) => {
+    const annulla = () => rifiuta(new DOMException('Annullata', 'AbortError'));
+    if (segnale.aborted) return annulla();
+    segnale.addEventListener('abort', annulla, { once: true });
+
+    window.Capacitor.Plugins.CapacitorHttp.request({
+      url: stato.cfg.url,
+      method: 'POST',
+      headers,
+      data: richiesta,
+      responseType: 'text',
+      disableRedirects: true,
+      connectTimeout: TIMEOUT_MS,
+      readTimeout: TIMEOUT_MS,
+    }).then(
+      // Con Content-Type JSON il client nativo ignora responseType e
+      // restituisce data già decodificato: lo si riporta a testo.
+      r => risolvi({
+        status: r.status,
+        testo: typeof r.data === 'string' ? r.data : (r.data == null ? '' : JSON.stringify(r.data)),
+      }),
+      rifiuta,
+    ).finally(() => segnale.removeEventListener('abort', annulla));
+  });
+}
+
 /* ============ configurazione ============ */
 
 function leggiConfig() {
   stato.cfg.url = (localStorage.getItem(CHIAVI.url) || '').trim();
   stato.cfg.token = (localStorage.getItem(CHIAVI.token) || '').trim();
+  stato.cfg.accessId = (localStorage.getItem(CHIAVI.accessId) || '').trim();
+  stato.cfg.accessSecret = (localStorage.getItem(CHIAVI.accessSecret) || '').trim();
   return !!(stato.cfg.url && stato.cfg.token);
 }
 
+/* Con un messaggio (di solito un errore di autenticazione) si apre già sul
+   form: c'è qualcosa da correggere. Altrimenti, se una connessione esiste,
+   si mostra solo la scheda di stato. */
 function apriConfig(messaggio = '') {
-  $('#cfgUrl').value = stato.cfg.url;
-  $('#cfgToken').value = stato.cfg.token;
-  $('#cfgErrore').hidden = true;
-
   const primaVolta = !(stato.cfg.url && stato.cfg.token);
-  $('#cfgTitolo').textContent = primaVolta ? 'Configurazione' : 'Impostazioni';
-  $('#cfgChiudi').hidden = primaVolta;
+  $('#cfgHead').hidden = primaVolta;
   $('#cfgIntro').hidden = !primaVolta;
+  $('#cfgChiudi').hidden = primaVolta;
+  $('#cfgCancella').hidden = primaVolta;
+  $('#cfgSalva').textContent = primaVolta ? 'Collega' : 'Salva';
 
   const avviso = $('#cfgAvviso');
   avviso.textContent = messaggio;
   avviso.hidden = !messaggio;
 
+  vistaConfig(primaVolta || !!messaggio);
+
   chiudiFogli();
   $('#schermataConfig').hidden = false;
   $('#app').hidden = true;
+}
+
+function vistaConfig(modifica) {
+  const primaVolta = !(stato.cfg.url && stato.cfg.token);
+  $('#cfgStato').hidden = modifica;
+  $('#formConfig').hidden = !modifica;
+  $('#cfgAnnulla').hidden = primaVolta;
+
+  if (modifica) {
+    $('#cfgUrl').value = stato.cfg.url;
+    $('#cfgToken').value = stato.cfg.token;
+    $('#cfgAccessId').value = stato.cfg.accessId;
+    $('#cfgAccessSecret').value = stato.cfg.accessSecret;
+    $('#cfgAccess').hidden = !NATIVA;
+    $('#cfgErrore').hidden = true;
+    for (const b of $$('[data-vedi]')) {
+      $('#' + b.dataset.vedi).type = 'password';
+      b.textContent = 'Mostra';
+    }
+  } else {
+    aggiornaSchedaStato();
+  }
+}
+
+const STATI_CONNESSIONE = {
+  ok:   { titolo: 'Connesso', classe: 'ok' },
+  rete: { titolo: 'API non raggiungibile', classe: 'ko' },
+  auth: { titolo: 'Credenziali rifiutate', classe: 'ko' },
+};
+
+function aggiornaSchedaStato() {
+  const s = STATI_CONNESSIONE[stato.connessione] || { titolo: 'Non ancora verificato', classe: '' };
+  $('#cfgPallino').className = `cfg-pallino ${s.classe}`;
+  $('#cfgStatoTit').textContent = s.titolo;
+
+  let host = stato.cfg.url;
+  try { host = new URL(stato.cfg.url).host; } catch { /* resta l'URL grezzo */ }
+  $('#cfgHost').textContent = host;
+
+  $('#cfgTokenMask').textContent = `•••• ${stato.cfg.token.slice(-4)}`;
+  $('#cfgRigaAccess').hidden = !NATIVA;
+  $('#cfgAccessStato').textContent = stato.cfg.accessId ? 'Service token attivo' : 'Non configurato';
 }
 
 function chiudiConfig() {
@@ -1384,7 +1510,8 @@ function collegaEventi() {
       errore.hidden = false;
       return;
     }
-    if (u.origin !== window.location.origin) {
+    // Nell'APK l'app vive su https://localhost: l'API è per forza altrove.
+    if (!NATIVA && u.origin !== window.location.origin) {
       errore.textContent = "L'API deve stare sullo stesso dominio dell'app.";
       errore.hidden = false;
       return;
@@ -1395,26 +1522,47 @@ function collegaEventi() {
       return;
     }
 
+    // Le credenziali Access sono facoltative (servono solo quando il bypass
+    // è stato tolto), ma vanno in coppia.
+    const accessId = NATIVA ? $('#cfgAccessId').value.trim() : '';
+    const accessSecret = NATIVA ? $('#cfgAccessSecret').value.trim() : '';
+    if (!accessId !== !accessSecret) {
+      errore.textContent = 'Client ID e Client Secret di Access vanno inseriti entrambi, o nessuno dei due.';
+      errore.hidden = false;
+      return;
+    }
+
     try {
       localStorage.setItem(CHIAVI.url, url);
       localStorage.setItem(CHIAVI.token, token);
+      localStorage.setItem(CHIAVI.accessId, accessId);
+      localStorage.setItem(CHIAVI.accessSecret, accessSecret);
     } catch {
       errore.textContent = 'Impossibile salvare la configurazione in questo browser.';
       errore.hidden = false;
       return;
     }
     leggiConfig();
+    stato.connessione = null; // credenziali nuove: l'esito precedente non vale più
     chiudiConfig();
     toast('Configurazione salvata.');
     stato.mScaduto = true;
     aggiornaManuale();
   });
 
-  $('#cfgVedi').addEventListener('click', () => {
-    const i = $('#cfgToken');
-    const visibile = i.type === 'text';
-    i.type = visibile ? 'password' : 'text';
-    $('#cfgVedi').textContent = visibile ? 'Mostra' : 'Nascondi';
+  for (const b of $$('[data-vedi]')) {
+    b.addEventListener('click', () => {
+      const i = $('#' + b.dataset.vedi);
+      const visibile = i.type === 'text';
+      i.type = visibile ? 'password' : 'text';
+      b.textContent = visibile ? 'Mostra' : 'Nascondi';
+    });
+  }
+
+  $('#cfgModifica').addEventListener('click', () => vistaConfig(true));
+  $('#cfgAnnulla').addEventListener('click', () => {
+    $('#cfgAvviso').hidden = true;
+    vistaConfig(false);
   });
 
   $('#cfgChiudi').addEventListener('click', chiudiConfig);
@@ -1423,7 +1571,9 @@ function collegaEventi() {
     if (!confirm('Cancellare URL e token salvati su questo dispositivo?')) return;
     localStorage.removeItem(CHIAVI.url);
     localStorage.removeItem(CHIAVI.token);
-    stato.cfg = { url: '', token: '' };
+    localStorage.removeItem(CHIAVI.accessId);
+    localStorage.removeItem(CHIAVI.accessSecret);
+    stato.cfg = { url: '', token: '', accessId: '', accessSecret: '' };
     stato.riep = null; stato.rStato = 'idle';
     stato.config = null;
     stato.and = null;
@@ -1450,7 +1600,8 @@ function avvia() {
     aggiornaManuale();
   }
 
-  if ('serviceWorker' in navigator) {
+  // Nell'APK gli asset sono già nel pacchetto: il service worker non serve.
+  if (!NATIVA && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       // updateViaCache: 'none' — sw.js va sempre riletto dalla rete, altrimenti
       // la cache HTTP può nascondere il cambio di versione.
