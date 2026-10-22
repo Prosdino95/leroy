@@ -12,7 +12,7 @@
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.5,
       "position": [
-        -800,
+        -928,
         -48
       ],
       "id": "577a6ed1-6153-456b-9851-408ae86aaacb",
@@ -20,7 +20,7 @@
       "credentials": {
         "telegramApi": {
           "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
+          "name": "Leroy"
         }
       }
     },
@@ -107,7 +107,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const tx = $('Decidi categoria').first().json;\n\n// Hash a 64 bit (FNV-1a). Non e' crittografia: serve solo come chiave\n// di identita' per la deduplica, e il Code node di n8n non espone crypto.\nfunction hash64(str) {\n  let h = 0xcbf29ce484222325n;\n  const p = 0x100000001b3n;\n  for (let i = 0; i < str.length; i++) {\n    h ^= BigInt(str.charCodeAt(i));\n    h = (h * p) & 0xffffffffffffffffn;\n  }\n  return h.toString(16).padStart(16, '0');\n}\n\nfunction uuid() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n  });\n}\n\nlet categoria = tx.categoria;\nlet confidenza = tx.confidenza ?? 0.2;\n\nif (!tx.categoria) {\n  try {\n    const risposta = $('Gemini').first().json;\n    const testo = risposta.candidates[0].content.parts[0].text\n      .replace(/```json|```/g, '').trim();\n    const parsed = JSON.parse(testo);\n    if (tx.categorie_disponibili.includes(parsed.categoria)) {\n      categoria = parsed.categoria;\n      confidenza = Number(parsed.confidenza) || 0.5;\n    }\n  } catch (e) {\n    // Gemini muto o risposta illeggibile: ripiego e chiedo conferma.\n  }\n  if (!categoria) { categoria = tx.categorie_disponibili[0]; confidenza = 0.2; }\n}\n\nconst oggi = new Date().toISOString().slice(0, 10);\nconst daVerificare = confidenza < 0.75;\n\n// Cosa mostrare nella risposta: il posto se lo conosci, altrimenti cosa hai preso.\nconst etichetta = tx.esercente || tx.descrizione;\n\n// Il message_id di Telegram rende l'hash unico per messaggio: se Telegram\n// ritrasmette lo stesso update, l'hash coincide e il doppione e' visibile.\nconst hash = hash64([oggi, tx.importo.toFixed(2), etichetta,\n                     tx.conto, tx.message_id].join('|'));\n\nconst id = uuid();\nconst segno = tx.tipo === 'entrata' ? '+' : '−';\n\nconst risposta_testo = segno + ' ' +\n  tx.importo.toFixed(2).replace('.', ',') + ' €  ' + categoria +\n  (etichetta ? '<br>' + etichetta : '') + '<br>' + tx.conto +\n  (daVerificare ? '<br><br>Categoria incerta, confermi?' : '');\n\n// Bottoni solo se la confidenza e' bassa.\n// Nella callback viaggiano l'hash (chiave di riga) e il NOME della categoria:\n// cosi' al ritorno non serve ricostruire nessuna lista. Telegram limita\n// callback_data a 64 byte, da cui il filtro sui nomi lunghi.\nlet tastiera = null;\nif (daVerificare) {\n  const cats = tx.categorie_disponibili.filter(c => c.length <= 40);\n  const righe = [];\n  for (let i = 0; i < cats.length; i += 2) {\n    righe.push(cats.slice(i, i + 2).map(c => ({\n      text: c,\n      callback_data: 'c|' + hash + '|' + c,\n    })));\n  }\n  righe.push([{ text: 'Va bene cosi', callback_data: 'ok|' + hash + '|' + categoria }]);\n  tastiera = { inline_keyboard: righe };\n}\n\n// Il payload per Telegram si costruisce qui, dove i dati ci sono gia'.\n// reply_markup viene aggiunto solo se serve: passarlo a null fa storcere\n// il naso all'API.\nconst payload = { chat_id: tx.chat_id, text: risposta_testo };\nif (tastiera) payload.reply_markup = tastiera;\n\n// Gia' serializzato: nel nodo HTTP basta referenziarlo, niente\n// JSON.stringify dentro l'espressione.\nconst payload_json = JSON.stringify(payload);\n\nreturn [{ json: {\n  riga: {\n    id,\n    data_evento: oggi,\n    data_inserimento: new Date().toISOString(),\n    fonte: 'telegram',\n    tipo: tx.tipo,\n    importo: tx.importo.toFixed(2),\n    valuta: 'EUR',\n    conto: tx.conto,\n    esercente: tx.esercente,\n    categoria,\n    sottocategoria: '',\n    note: tx.descrizione,\n    testo_grezzo: tx.testo_grezzo,\n    hash_dedup: hash,\n    confidenza: confidenza.toFixed(2),\n    stato: daVerificare ? 'da_verificare' : 'confermata',\n  },\n  payload,\n  payload_json,\n}}];"
+        "jsCode": "const tx = $('Decidi categoria').first().json;\n\n// Hash a 64 bit (FNV-1a). Non e' crittografia: serve solo come chiave\n// di identita' per la deduplica, e il Code node di n8n non espone crypto.\nfunction hash64(str) {\n  let h = 0xcbf29ce484222325n;\n  const p = 0x100000001b3n;\n  for (let i = 0; i < str.length; i++) {\n    h ^= BigInt(str.charCodeAt(i));\n    h = (h * p) & 0xffffffffffffffffn;\n  }\n  return h.toString(16).padStart(16, '0');\n}\n\nfunction uuid() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n  });\n}\n\nlet categoria = tx.categoria;\nlet confidenza = tx.confidenza ?? 0.2;\n\nif (!tx.categoria) {\n  try {\n    const risposta = $('Gemini').first().json;\n    const testo = risposta.candidates[0].content.parts[0].text\n      .replace(/```json|```/g, '').trim();\n    const parsed = JSON.parse(testo);\n    if (tx.categorie_disponibili.includes(parsed.categoria)) {\n      categoria = parsed.categoria;\n      confidenza = Number(parsed.confidenza) || 0.5;\n    }\n  } catch (e) {\n    // Gemini muto o risposta illeggibile: ripiego e chiedo conferma.\n  }\n  if (!categoria) { categoria = tx.categorie_disponibili[0]; confidenza = 0.2; }\n}\n\n// \"Oggi\" e' il giorno di calendario a Roma: con toISOString() tra\n// mezzanotte e le 2 la spesa finiva sul giorno prima.\nconst oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });\nconst daVerificare = confidenza < 0.75;\n\n// Cosa mostrare nella risposta: il posto se lo conosci, altrimenti cosa hai preso.\nconst etichetta = tx.esercente || tx.descrizione;\n\n// Il message_id di Telegram rende l'hash unico per messaggio: se Telegram\n// ritrasmette lo stesso update, l'hash coincide e il doppione e' visibile.\nconst hash = hash64([oggi, tx.importo.toFixed(2), etichetta,\n                     tx.conto, tx.message_id].join('|'));\n\nconst id = uuid();\nconst segno = tx.tipo === 'entrata' ? '+' : '−';\n\n// Bottoni solo se la confidenza e' bassa.\n// Nella callback viaggiano l'hash (chiave di riga) e il NOME della categoria:\n// cosi' al ritorno non serve ricostruire nessuna lista. Telegram limita\n// callback_data a 64 byte, da cui il filtro sui nomi lunghi.\n// Il nodo Telegram che li invia ha una griglia fissa di 11 righe (10 coppie +\n// \"Va bene cosi\"): con un numero diverso di categorie la tastiera non si puo'\n// costruire e si ripiega su un messaggio senza bottoni.\nlet tastiera = null;\nif (daVerificare) {\n  const cats = tx.categorie_disponibili.filter(c => c.length <= 40);\n  const righe = [];\n  for (let i = 0; i < cats.length; i += 2) {\n    righe.push(cats.slice(i, i + 2).map(c => ({\n      text: c,\n      callback_data: 'c|' + hash + '|' + c,\n    })));\n  }\n  righe.push([{ text: 'Va bene cosi', callback_data: 'ok|' + hash + '|' + categoria }]);\n  if (righe.length === 11 && righe.slice(0, 10).every(r => r.length === 2)) {\n    tastiera = { inline_keyboard: righe };\n  }\n}\n\nconst risposta_testo = segno + ' ' +\n  tx.importo.toFixed(2).replace('.', ',') + ' €  ' + categoria +\n  (etichetta ? '<br>' + etichetta : '') + '<br>' + tx.conto +\n  (daVerificare\n    ? (tastiera ? '<br><br>Categoria incerta, confermi?'\n                : '<br><br>Categoria incerta: correggila dall\\'app.')\n    : '');\n\n// Il payload per Telegram si costruisce qui, dove i dati ci sono gia'.\n// reply_markup viene aggiunto solo se serve: passarlo a null fa storcere\n// il naso all'API.\nconst payload = { chat_id: tx.chat_id, text: risposta_testo };\nif (tastiera) payload.reply_markup = tastiera;\n\n// Gia' serializzato: nel nodo HTTP basta referenziarlo, niente\n// JSON.stringify dentro l'espressione.\nconst payload_json = JSON.stringify(payload);\n\nreturn [{ json: {\n  riga: {\n    id,\n    data_evento: oggi,\n    data_inserimento: new Date().toISOString(),\n    fonte: 'telegram',\n    tipo: tx.tipo,\n    importo: tx.importo.toFixed(2),\n    valuta: 'EUR',\n    conto: tx.conto,\n    esercente: tx.esercente,\n    categoria,\n    sottocategoria: '',\n    note: tx.descrizione,\n    testo_grezzo: tx.testo_grezzo,\n    hash_dedup: hash,\n    confidenza: confidenza.toFixed(2),\n    stato: daVerificare ? 'da_verificare' : 'confermata',\n  },\n  payload,\n  payload_json,\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -133,7 +133,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nconst tx = $('Estrai transazione').first().json;\n\nconst regole = $('Leggi Regole').all()\n  .map(i => i.json)\n  .filter(r => normalizza(String(r.pattern || '')).length >= 2);\n\nconst categorie = $('Leggi Categorie').all()\n  .map(i => i.json)\n  .filter(c => c.categoria && String(c.tipo).toLowerCase() === tx.tipo)\n  .map(c => String(c.categoria));\n\n// 1) Regole locali: gratis e istantanee.\n// Il match avviene su esercente + descrizione insieme, cosi' funziona sia\n// con \"@coop\" sia con \"spesa settimanale\".\nconst testoMatch = normalizza((tx.esercente || '') + ' ' + (tx.descrizione || ''));\nconst regola = regole.find(r => testoMatch &&\n  testoMatch.includes(normalizza(r.pattern)));\n\nif (regola) {\n  return [{ json: {\n    ...tx,\n    categoria: String(regola.categoria),\n    confidenza: 1,\n    serve_ai: false,\n    categorie_disponibili: categorie,\n  }}];\n}\n\n// 2) Niente regola: prepariamo il prompt per Gemini.\nconst prompt = 'Classifica questa transazione in UNA delle categorie elencate.\\n\\n' +\n  'Categorie ammesse:\\n' + categorie.join('\\n') + '\\n\\n' +\n  'Descrizione: \"' + [tx.esercente, tx.descrizione].filter(Boolean).join(' ') +\n  '\"\\n\\n' +\n  'Rispondi solo con JSON: {\"categoria\": \"<una delle categorie>\", \"confidenza\": <0.0-1.0>}\\n' +\n  'La confidenza sia bassa se la descrizione e ambigua.';\n\nconst body = {\n  contents: [{ parts: [{ text: prompt }] }],\n  generationConfig: { responseMimeType: 'application/json' },\n};\nreturn [{ json: {\n  ...tx,\n  categoria: '',\n  prompt,\n  serve_ai: true,\n  body_json: JSON.stringify(body),\n  categorie_disponibili: categorie,\n}}];"
+        "jsCode": "function normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nconst tx = $('Estrai transazione').first().json;\n\nconst regole = $('Leggi Regole').all()\n  .map(i => i.json)\n  .filter(r => normalizza(String(r.pattern || '')).length >= 2);\n\nconst categorie = $('Leggi Categorie').all()\n  .map(i => i.json)\n  .filter(c => c.categoria && String(c.tipo).toLowerCase() === tx.tipo)\n  .map(c => String(c.categoria));\n\n// 1) Regole locali: gratis e istantanee.\n// Il match avviene su esercente + descrizione insieme, cosi' funziona sia\n// con \"@coop\" sia con \"spesa settimanale\".\nconst testoMatch = normalizza((tx.esercente || '') + ' ' + (tx.descrizione || ''));\nconst regola = regole.find(r => testoMatch &&\n  testoMatch.includes(normalizza(r.pattern)));\n\n// La categoria della regola deve esistere davvero per questo tipo di\n// movimento (e va ricondotta al nome esatto: una regola salvata con una\n// tabulazione davanti scriveva categorie che nessun conteggio riconosceva).\nconst catRegola = regola\n  ? categorie.find(c => normalizza(c) === normalizza(regola.categoria))\n  : null;\n\nif (catRegola) {\n  return [{ json: {\n    ...tx,\n    categoria: catRegola,\n    confidenza: 1,\n    serve_ai: false,\n    categorie_disponibili: categorie,\n  }}];\n}\n\n// 2) Niente regola: prepariamo il prompt per Gemini.\nconst prompt = 'Classifica questa transazione in UNA delle categorie elencate.\\n\\n' +\n  'Categorie ammesse:\\n' + categorie.join('\\n') + '\\n\\n' +\n  'Descrizione: \"' + [tx.esercente, tx.descrizione].filter(Boolean).join(' ') +\n  '\"\\n\\n' +\n  'Rispondi solo con JSON: {\"categoria\": \"<una delle categorie>\", \"confidenza\": <0.0-1.0>}\\n' +\n  'La confidenza sia bassa se la descrizione e ambigua.';\n\nconst body = {\n  contents: [{ parts: [{ text: prompt }] }],\n  generationConfig: { responseMimeType: 'application/json' },\n};\nreturn [{ json: {\n  ...tx,\n  categoria: '',\n  prompt,\n  serve_ai: true,\n  body_json: JSON.stringify(body),\n  categorie_disponibili: categorie,\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -157,7 +157,7 @@
             {
               "id": "f0ed9748-1003-4d23-afed-f5bfdde30c39",
               "leftValue": "={{ ($json.message || $json.callback_query).from.id }}",
-              "rightValue": 369010791,
+              "rightValue": "={{ $json.cfg.utente_id }}",
               "operator": {
                 "type": "number",
                 "operation": "equals"
@@ -199,8 +199,8 @@
       "alwaysOutputData": true,
       "credentials": {
         "httpQueryAuth": {
-          "id": "CRED_GEMINI",
-          "name": "Gemini"
+          "id": "CRED_HTTPQUERYAUTH",
+          "name": "Gemini - leroy"
         }
       },
       "onError": "continueRegularOutput"
@@ -322,92 +322,6 @@
     },
     {
       "parameters": {
-        "jsCode": "const prep = $('Prepara domanda').first().json;\nconst risposta = $('Gemini domanda').first().json;\n\nconst parts = risposta?.candidates?.[0]?.content?.parts || [];\nconst grezzo = parts.map(p => p.text).filter(Boolean).join('')\n  .replace(/```json|```/g, '').trim();\n\nlet f = null;\ntry { f = JSON.parse(grezzo); } catch { f = null; }\n\nconst fallito = (msg) => [{ json: { chat_id: prep.chat_id, errore: msg } }];\n\nif (!f) return fallito('Non sono riuscito a interpretare la domanda. Riprova.');\nif (f.capita === false) {\n  return fallito('Rispondo solo a domande su spese e movimenti. Prova con ' +\n                 '\"quanto ho speso in ristoranti a luglio\".');\n}\n\n// --- validazione di ogni campo ---\nconst ISO = /^\\d{4}-\\d{2}-\\d{2}$/;\nconst numOrNull = (v) =>\n  (v === null || v === undefined || v === '') ? null\n  : (Number.isFinite(Number(v)) ? Number(v) : null);\n\n// La categoria deve esistere davvero: il confronto è insensibile alle\n// maiuscole e riconduce al nome esatto del foglio.\nconst cat = prep.categorie.find(c =>\n  c.toLowerCase() === String(f.categoria || '').toLowerCase()) || null;\n\nlet da = ISO.test(String(f.da)) ? String(f.da) : null;\nlet a  = ISO.test(String(f.a))  ? String(f.a)  : null;\nif (da && a && da > a) { const t = da; da = a; a = t; }   // intervallo invertito\n\nconst filtro = {\n  azione: 'cerca',\n  q: f.q ? String(f.q).slice(0, 60) : null,\n  da, a,\n  categoria: cat,\n  tipo: ['spesa', 'entrata'].includes(f.tipo) ? f.tipo : null,\n  min: numOrNull(f.min),\n  max: numOrNull(f.max),\n  limite: 200,\n};\n\n// Un filtro completamente vuoto restituirebbe tutto lo storico: quasi sempre\n// significa che la domanda non è stata capita.\nconst vuoto = !filtro.q && !filtro.da && !filtro.a && !filtro.categoria &&\n              !filtro.tipo && filtro.min === null && filtro.max === null;\nif (vuoto) return fallito('Non ho capito su cosa cercare. Prova a indicare un ' +\n                          'periodo, una categoria o un nome.');\n\nconst agg = ['totale', 'elenco', 'per_categoria'].includes(f.aggregazione)\n  ? f.aggregazione : 'totale';\n\nreturn [{ json: {\n  chat_id: prep.chat_id,\n  aggregazione: agg,\n  filtro,\n  filtro_json: JSON.stringify(filtro),\n}}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        992,
-        -144
-      ],
-      "id": "b9156367-1af4-46b5-a498-d41d0d86103b",
-      "name": "Leggi filtro"
-    },
-    {
-      "parameters": {
-        "jsCode": "const q = $('Estrai transazione').first().json;\n\nconst categorie = $('Leggi Categorie1').all().map(i => i.json)\n  .filter(c => c.categoria).map(c => String(c.categoria));\n\n// Il modello deve sapere che giorno è, altrimenti \"a luglio\" non ha senso.\nconst oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });\n\nconst prompt =\n  'Traduci la domanda in un filtro di ricerca. Oggi è ' + oggi + '.\\n\\n' +\n  'Categorie esistenti:\\n' + categorie.join('\\n') + '\\n\\n' +\n  'Domanda: \"' + q.testo + '\"\\n\\n' +\n  'Rispondi solo con JSON:\\n' +\n  '{\"capita\": true|false, \"q\": \"<parole chiave>\"|null,\\n' +\n  ' \"da\": \"YYYY-MM-DD\"|null, \"a\": \"YYYY-MM-DD\"|null,\\n' +\n  ' \"categoria\": \"<una delle categorie>\"|null,\\n' +\n  ' \"tipo\": \"spesa\"|\"entrata\"|null,\\n' +\n  ' \"min\": <numero>|null, \"max\": <numero>|null,\\n' +\n  ' \"aggregazione\": \"totale\"|\"elenco\"|\"per_categoria\"}\\n\\n' +\n  'Regole:\\n' +\n  '- Interpreta il tempo rispetto a oggi. \"luglio\" senza anno è il luglio più ' +\n  'recente già iniziato. \"questo mese\" è il mese di oggi. \"ultimi tre mesi\" ' +\n  'parte da tre mesi fa e arriva a oggi. \"l anno scorso\" è l anno solare ' +\n  'precedente per intero.\\n' +\n  '- Se non c è alcun riferimento temporale, lascia da e a a null: la ricerca ' +\n  'coprirà tutto lo storico.\\n' +\n  '- aggregazione: \"quanto ho speso\" -> totale. \"cosa\", \"quali\", \"mostrami\", ' +\n  '\"elenca\" -> elenco. \"come ho speso\", \"in cosa\", \"per categoria\" -> ' +\n  'per_categoria.\\n' +\n  '- categoria SOLO se coincide con una dell elenco. Altrimenti null, e le ' +\n  'parole rilevanti finiscono in q.\\n' +\n  '- q contiene il nome di un esercente o di un luogo, mai parole generiche ' +\n  'come \"speso\", \"soldi\", \"spese\". Se non ce n è, null.\\n' +\n  '- capita false se la domanda non riguarda movimenti, spese o entrate.';\n\nreturn [{ json: {\n  chat_id: q.chat_id,\n  testo: q.testo,\n  categorie,\n  body_json: JSON.stringify({\n    contents: [{ parts: [{ text: prompt }] }],\n    generationConfig: { responseMimeType: 'application/json' },\n  }),\n}}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        544,
-        -144
-      ],
-      "id": "36c025eb-6335-4fd4-b1cd-12dfa59b51ca",
-      "name": "Prepara domanda"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "0d23abe0-fcde-48b5-966d-b392a94c5227",
-              "leftValue": "={{ $json.filtro_json }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        1216,
-        -144
-      ],
-      "id": "68763f0c-febf-4188-9555-0f5d1d54441a",
-      "name": "If2"
-    },
-    {
-      "parameters": {
-        "jsCode": "const f = $('Leggi filtro').first().json;\nconst r = $('Chiama ricerca').first().json || {};\n\nconst eur = (n) => (Math.round(Number(n) * 100) / 100).toFixed(2)\n  .replace('.', ',') + ' €';\nconst esc = (s) => String(s)\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst gg = (d) => String(d).slice(8) + '/' + String(d).slice(5, 7);\n\nif (r.ok === false || r.error || !Number.isFinite(Number(r.conteggio))) {\n  return [{ json: {\n      text: 'La ricerca non è riuscita. Riprova fra poco.',\n  }}];\n}\n\nlet t;\n\nif (!r.conteggio) {\n  t = 'Nessun movimento trovato.';\n} else if (f.aggregazione === 'elenco') {\n  const righe = (r.movimenti || []).slice(0, 15).map(m =>\n    gg(m.data) + '  ' + eur(m.importo) + '  ' + esc(m.etichetta || m.categoria));\n  t = '<b>' + r.conteggio + ' movimenti · ' + eur(r.totale) + '</b><br><br>' +\n      righe.join('<br>');\n  if (r.conteggio > 15) t += '<br>…e altri ' + (r.conteggio - 15);\n} else if (f.aggregazione === 'per_categoria') {\n  const righe = (r.per_categoria || []).slice(0, 12).map(c =>\n    esc(c.nome) + ': ' + eur(c.totale));\n  t = '<b>' + eur(r.totale) + '</b> in ' + r.conteggio + ' movimenti<br><br>' +\n      righe.join('<br>');\n} else {\n  t = '<b>' + eur(r.totale) + '</b>\\n' + r.conteggio + ' movimenti';\n}\n\n// Cosa ha capito il modello, sempre in fondo. Senza questa riga un\n// fraintendimento sul periodo produrrebbe un numero sbagliato dall'aria\n// perfettamente credibile.\nconst pezzi = [];\nif (f.filtro.da || f.filtro.a) {\n  pezzi.push((f.filtro.da ? gg(f.filtro.da) + '/' + String(f.filtro.da).slice(0, 4) : 'inizio') +\n             ' → ' +\n             (f.filtro.a ? gg(f.filtro.a) + '/' + String(f.filtro.a).slice(0, 4) : 'oggi'));\n} else {\n  pezzi.push('tutto lo storico');\n}\nif (f.filtro.categoria) pezzi.push(esc(f.filtro.categoria));\nif (f.filtro.q) pezzi.push('\"' + esc(f.filtro.q) + '\"');\nif (f.filtro.tipo) pezzi.push(f.filtro.tipo);\n\nt += '<br><br><i>' + pezzi.join(' · ') + '</i>';\n\nreturn [{ json: {\n    text: t.slice(0, 4000),\n}}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1664,
-        -240
-      ],
-      "id": "8719884a-aa73-41ed-95ee-240171959dd6",
-      "name": "Formatta risposta"
-    },
-    {
-      "parameters": {
-        "jsCode": "const e = $json;\nreturn [{ json: {\ntext: e.errore ,\n}}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1664,
-        -48
-      ],
-      "id": "c2a9a153-f5d3-4e9c-8da0-b1539cb724fc",
-      "name": "Formatta errore"
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -442,41 +356,12 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.body_json }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        768,
-        -144
-      ],
-      "id": "bc1419fe-a3cf-44c2-9e12-fd9dfbc6e667",
-      "name": "Gemini domanda",
-      "alwaysOutputData": true,
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "CRED_GEMINI",
-          "name": "Gemini"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_CATEGORY",
+          "value": "122yhgXS8I7WqpTM",
           "mode": "list",
-          "cachedResultName": "Category",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+          "cachedResultName": "Category"
         },
         "returnAll": true
       },
@@ -497,8 +382,7 @@
           "__rl": true,
           "value": "WL0zzKbwnzieSs6y",
           "mode": "list",
-          "cachedResultName": "Rules",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/WL0zzKbwnzieSs6y"
+          "cachedResultName": "Rules"
         },
         "returnAll": true
       },
@@ -514,345 +398,15 @@
     },
     {
       "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
-          "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "data_evento": "={{ $json.riga.data_evento }}",
-            "data_inserimento": "={{ $json.riga.data_inserimento }}",
-            "fonte": "={{ $json.riga.fonte }}",
-            "tipo": "={{ $json.riga.tipo }}",
-            "importo": "={{ $json.riga.importo }}",
-            "valuta": "={{ $json.riga.valuta }}",
-            "conto": "={{ $json.riga.conto }}",
-            "esercente": "={{ $json.riga.esercente }}",
-            "categoria": "={{ $json.riga.categoria }}",
-            "sottocategoria": "={{ $json.riga.sottocategoria }}",
-            "note": "={{ $json.riga.note }}",
-            "testo_grezzo": "={{ $json.riga.testo_grezzo }}",
-            "hash_dedup": "={{ $json.riga.hash_dedup }}",
-            "stato": "={{ $json.riga.stato }}",
-            "confidenza": "={{ $json.riga.confidenza }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "data_evento",
-              "displayName": "data_evento",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "data_inserimento",
-              "displayName": "data_inserimento",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "fonte",
-              "displayName": "fonte",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "tipo",
-              "displayName": "tipo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "importo",
-              "displayName": "importo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "valuta",
-              "displayName": "valuta",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "conto",
-              "displayName": "conto",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "esercente",
-              "displayName": "esercente",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "categoria",
-              "displayName": "categoria",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "sottocategoria",
-              "displayName": "sottocategoria",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "note",
-              "displayName": "note",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "testo_grezzo",
-              "displayName": "testo_grezzo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "hash_dedup",
-              "displayName": "hash_dedup",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "confidenza",
-              "displayName": "confidenza",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "stato",
-              "displayName": "stato",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        1888,
-        192
-      ],
-      "id": "5b77eb76-baa0-489f-ae7e-4cf767af726c",
-      "name": "Insert row",
-      "retryOnFail": true
-    },
-    {
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "value": "DATATABLE_CATEGORY",
-          "mode": "list",
-          "cachedResultName": "Category",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
-        },
-        "returnAll": true
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        320,
-        -144
-      ],
-      "id": "9ea3a52f-4ffb-4814-b5a4-e1a07f000e40",
-      "name": "Leggi Categorie1",
-      "executeOnce": true,
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "WF_SEARCH",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/WF_SEARCH",
-          "cachedResultName": "Leroy Search"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "q": "={{ $json.filtro.q }}",
-            "da": "={{ $json.filtro.da }}",
-            "a": "={{ $json.filtro.a }}",
-            "categoria": "={{ $json.filtro.categoria }}",
-            "tipo": "={{ $json.filtro.tipo }}",
-            "min": "={{ $json.filtro.min }}",
-            "max": "={{ $json.filtro.max }}"
-          },
-          "matchingColumns": [
-            "body_firstItem"
-          ],
-          "schema": [
-            {
-              "id": "q",
-              "displayName": "q",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "da",
-              "displayName": "da",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "a",
-              "displayName": "a",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "categoria",
-              "displayName": "categoria",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "tipo",
-              "displayName": "tipo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "min",
-              "displayName": "min",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "max",
-              "displayName": "max",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {
-          "waitForSubWorkflow": true
-        }
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        1440,
-        -240
-      ],
-      "id": "0731274f-bd46-4e49-89fe-708ff42d7d04",
-      "name": "Chiama ricerca"
-    },
-    {
-      "parameters": {
         "operation": "sendRichMessage",
-        "chatId": "369010791",
+        "chatId": "={{ $('Configura').first().json.cfg.chat_id }}",
         "richMessageText": "={{ $json.text }}",
         "additionalFields": {}
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1888,
+        560,
         -144
       ],
       "id": "afb21a81-d84a-4749-a809-97133ac782c5",
@@ -860,7 +414,7 @@
       "credentials": {
         "telegramApi": {
           "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
+          "name": "Leroy"
         }
       }
     },
@@ -869,10 +423,9 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
         "matchType": "allConditions",
         "filters": {
@@ -900,10 +453,9 @@
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
         "matchType": "allConditions",
         "filters": {
@@ -1093,10 +645,9 @@
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
         "matchType": "allConditions",
         "filters": {
@@ -1285,8 +836,7 @@
           "__rl": true,
           "value": "WL0zzKbwnzieSs6y",
           "mode": "list",
-          "cachedResultName": "Rules",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/WL0zzKbwnzieSs6y"
+          "cachedResultName": "Rules"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -1366,7 +916,7 @@
     {
       "parameters": {
         "operation": "sendRichMessage",
-        "chatId": "369010791",
+        "chatId": "={{ $('Configura').first().json.cfg.chat_id }}",
         "richMessageText": "={{ $('Componi riga').item.json.payload.text }}",
         "replyMarkup": "inlineKeyboard",
         "inlineKeyboard": {
@@ -1509,7 +1059,7 @@
                   {
                     "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[7][1].text }}",
                     "additionalFields": {
-                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[7][0].callback_data }}"
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[7][1].callback_data }}"
                     }
                   }
                 ]
@@ -1521,7 +1071,7 @@
                   {
                     "text": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[8][0].text }}",
                     "additionalFields": {
-                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[8][1].callback_data }}"
+                      "callback_data": "={{ $('Componi riga').item.json.payload.reply_markup.inline_keyboard[8][0].callback_data }}"
                     }
                   },
                   {
@@ -1570,7 +1120,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        2112,
+        2448,
         192
       ],
       "id": "0b40659f-24e1-4015-a0b5-944904fe1dfe",
@@ -1578,7 +1128,7 @@
       "credentials": {
         "telegramApi": {
           "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
+          "name": "Leroy"
         }
       }
     },
@@ -1601,7 +1151,7 @@
       "credentials": {
         "telegramApi": {
           "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
+          "name": "Leroy"
         }
       }
     },
@@ -1624,14 +1174,14 @@
       "credentials": {
         "telegramApi": {
           "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
+          "name": "Leroy"
         }
       }
     },
     {
       "parameters": {
         "operation": "sendRichMessage",
-        "chatId": "369010791",
+        "chatId": "={{ $('Configura').first().json.cfg.chat_id }}",
         "richMessageText": "={{ $json.text }}",
         "additionalFields": {}
       },
@@ -1646,7 +1196,7 @@
       "credentials": {
         "telegramApi": {
           "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
+          "name": "Leroy"
         }
       }
     },
@@ -1668,24 +1218,158 @@
       "credentials": {
         "telegramApi": {
           "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
+          "name": "Leroy"
         }
       }
-    }
-  ],
-  "pinData": {},
-  "connections": {
-    "Telegram Trigger": {
-      "main": [
-        [
-          {
-            "node": "sono io?",
-            "type": "main",
-            "index": 0
-          }
-        ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5d0f6a52-3c1b-4f7e-8a21-2f9b4c7e1a10",
+              "leftValue": "={{ $('Componi riga').item.json.payload.reply_markup ? true : false }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a85c9962-2bfd-42d2-bbbe-d6829e84036f",
+      "name": "Servono bottoni?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2224,
+        192
       ]
     },
+    {
+      "parameters": {
+        "operation": "sendRichMessage",
+        "chatId": "={{ $('Configura').first().json.cfg.chat_id }}",
+        "richMessageText": "={{ $('Componi riga').item.json.payload.text }}",
+        "additionalFields": {}
+      },
+      "id": "929c293d-442a-4082-b223-38abaa4b7c23",
+      "name": "Invia riga",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2448,
+        352
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Leroy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "bMZumuoVYedxcdEq",
+          "cachedResultName": "Leroy Config"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "26e6fde2-8bf2-447e-89fd-154696917c72",
+      "name": "Configura",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -704,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6a1f0c52-7b3d-4e8a-9c21-4d5e6f708192",
+              "name": "modo",
+              "value": "diretto",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "0c4d2137-66ae-4148-9c74-3c01e3f6e2d6",
+      "name": "Modo diretto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1888,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "pA2qDu8chrkJBh7K",
+          "cachedResultName": "Leroy Scrivi"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "72e5e1b9-5187-436a-ba61-40d0489eb9d7",
+      "name": "Scrivi riga",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2000,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ld4zKayHMlUoTu3X",
+          "cachedResultName": "Leroy Chiedi"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "e2d4dd0b-37e6-404c-aa2c-f8c12c917d3d",
+      "name": "Chiedi",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        320,
+        -144
+      ]
+    }
+  ],
+  "connections": {
     "Estrai transazione": {
       "main": [
         [
@@ -1727,17 +1411,6 @@
         [
           {
             "node": "Componi riga",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Componi riga": {
-      "main": [
-        [
-          {
-            "node": "Insert row",
             "type": "main",
             "index": 0
           }
@@ -1846,7 +1519,7 @@
       "main": [
         [
           {
-            "node": "Leggi Categorie1",
+            "node": "Chiedi",
             "type": "main",
             "index": 0
           }
@@ -1854,68 +1527,6 @@
         [
           {
             "node": "If3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepara domanda": {
-      "main": [
-        [
-          {
-            "node": "Gemini domanda",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leggi filtro": {
-      "main": [
-        [
-          {
-            "node": "If2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If2": {
-      "main": [
-        [
-          {
-            "node": "Chiama ricerca",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Formatta errore",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Formatta risposta": {
-      "main": [
-        [
-          {
-            "node": "Send a rich message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Formatta errore": {
-      "main": [
-        [
-          {
-            "node": "Send a rich message",
             "type": "main",
             "index": 0
           }
@@ -1940,17 +1551,6 @@
         ]
       ]
     },
-    "Gemini domanda": {
-      "main": [
-        [
-          {
-            "node": "Leggi filtro",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Leggi Regole": {
       "main": [
         [
@@ -1967,39 +1567,6 @@
         [
           {
             "node": "Decidi categoria",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Insert row": {
-      "main": [
-        [
-          {
-            "node": "Send a rich message1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Leggi Categorie1": {
-      "main": [
-        [
-          {
-            "node": "Prepara domanda",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Chiama ricerca": {
-      "main": [
-        [
-          {
-            "node": "Formatta risposta",
             "type": "main",
             "index": 0
           }
@@ -2050,14 +1617,88 @@
         ]
       ]
     },
-    "Send a rich message1": {
+    "Servono bottoni?": {
       "main": [
-        []
+        [
+          {
+            "node": "Send a rich message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invia riga",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Send a rich message": {
+    "Telegram Trigger": {
       "main": [
-        []
+        [
+          {
+            "node": "Configura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configura": {
+      "main": [
+        [
+          {
+            "node": "sono io?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi riga": {
+      "main": [
+        [
+          {
+            "node": "Modo diretto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modo diretto": {
+      "main": [
+        [
+          {
+            "node": "Scrivi riga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrivi riga": {
+      "main": [
+        [
+          {
+            "node": "Servono bottoni?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chiedi": {
+      "main": [
+        [
+          {
+            "node": "Send a rich message",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
@@ -2065,16 +1706,20 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false,
+    "availableInMCP": true,
     "timeSavedMode": "fixed",
-    "errorWorkflow": "WF_GUARDIANO",
-    "callerPolicy": "workflowsFromSameOwner"
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
   },
-  "versionId": "7efcdb74-dbba-49b4-b536-d21446ae831b",
+  "versionId": "a795112b-c248-4c12-aaaf-e273068921bc",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "nodeGroups": [],
-  "id": "WF_TELEGRAM",
+  "id": "eyMkIvQK4XvJsanL",
   "tags": []
 }

@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "// Solo questi mittenti proseguono. Il filtro sta qui apposta:\n// tutto il resto non lascia mai la tua casella.\nconst MITTENTI = [\n  'octopus', 'intesasanpaolo', 'revolut',\n  'enel', 'eni', 'a2a', 'hera',\n  'vodafone', 'tim.it', 'iliad', 'windtre','paypal', 'satispay'\n];\n\nfunction pulisci(html) {\n  return String(html || '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nreturn $input.all()\n  .map(i => i.json)\n  .filter(m => {\n    const from = (m.from?.emailAddress?.address\n      || m.sender?.emailAddress?.address || '').toLowerCase();\n    return from && MITTENTI.some(s => from.includes(s));\n  })\n  .map(m => {\n    const from = (m.from?.emailAddress?.address\n      || m.sender?.emailAddress?.address || '').toLowerCase().trim();\n    return { json: {\n      fonte: 'outlook',\n      id_esterno: m.id,\n      mittente: from,\n      oggetto: m.subject || '',\n      testo: (pulisci(m.body?.content) || m.bodyPreview || '').slice(0, 4000),\n      data: m.receivedDateTime || new Date().toISOString(),\n      ha_allegati: !!m.hasAttachments,\n    }};\n  });"
+        "jsCode": "// Solo questi mittenti proseguono. Il filtro sta qui apposta:\n// tutto il resto non lascia mai la tua casella.\nconst MITTENTI = [\n  'octopus', 'intesasanpaolo', 'revolut',\n  'enel', 'eni', 'a2a', 'hera',\n  'vodafone', 'tim.it', 'iliad', 'windtre','paypal', 'satispay'\n];\n\n// Il confronto avviene sul solo dominio e per etichette intere: un semplice\n// includes() sull'indirizzo faceva passare anche \"menu.it\" per via di \"eni\".\n// Una voce senza punto vale come inizio di un'etichetta del dominio\n// (\"octopus\" -> octopusenergy.it); una con punto vale come dominio intero\n// o suo sottodominio.\nfunction ammesso(from) {\n  const dominio = from.split('@').pop();\n  const etichette = dominio.split('.');\n  return MITTENTI.some(s => s.includes('.')\n    ? (dominio === s || dominio.endsWith('.' + s))\n    : etichette.some(e => e === s || e.startsWith(s)));\n}\n\nfunction pulisci(html) {\n  return String(html || '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nreturn $input.all()\n  .map(i => i.json)\n  .filter(m => {\n    const from = (m.from?.emailAddress?.address\n      || m.sender?.emailAddress?.address || '').toLowerCase();\n    return from && ammesso(from);\n  })\n  .map(m => {\n    const from = (m.from?.emailAddress?.address\n      || m.sender?.emailAddress?.address || '').toLowerCase().trim();\n    return { json: {\n      fonte: 'outlook',\n      id_esterno: m.id,\n      mittente: from,\n      oggetto: m.subject || '',\n      testo: (pulisci(m.body?.content) || m.bodyPreview || '').slice(0, 4000),\n      data: m.receivedDateTime || new Date().toISOString(),\n      ha_allegati: !!m.hasAttachments,\n    }};\n  });"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -18,9 +18,8 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "WF_PROCESSA_DATI",
+          "value": "R5bQDQB866kBCHeX",
           "mode": "list",
-          "cachedResultUrl": "/workflow/WF_PROCESSA_DATI",
           "cachedResultName": "Leroy Processa Dati"
         },
         "workflowInputs": {
@@ -122,7 +121,7 @@
       "name": "Microsoft Outlook Trigger",
       "credentials": {
         "microsoftOutlookOAuth2Api": {
-          "id": "CRED_OUTLOOK",
+          "id": "CRED_MICROSOFTOUTLOOKOAUTH2",
           "name": "Microsoft Outlook account"
         }
       }
@@ -140,8 +139,7 @@
             "__rl": true,
             "value": "YOUR_OUTLOOK_FOLDER_ID",
             "mode": "list",
-            "cachedResultName": "Elaborate da Leroy",
-            "cachedResultUrl": "https://outlook.office365.com/mail/YOUR_OUTLOOK_FOLDER_ID"
+            "cachedResultName": "Elaborate da Leroy"
           }
         }
       },
@@ -155,13 +153,12 @@
       "name": "Update a message",
       "credentials": {
         "microsoftOutlookOAuth2Api": {
-          "id": "CRED_OUTLOOK",
+          "id": "CRED_MICROSOFTOUTLOOKOAUTH2",
           "name": "Microsoft Outlook account"
         }
       }
     }
   ],
-  "pinData": {},
   "connections": {
     "Normalizza": {
       "main": [
@@ -201,16 +198,19 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false,
+    "availableInMCP": true,
     "timeSavedMode": "fixed",
-    "errorWorkflow": "WF_GUARDIANO",
-    "callerPolicy": "workflowsFromSameOwner"
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true
   },
-  "versionId": "e7d02579-4e06-49af-85b1-c6b99815df7c",
+  "versionId": "11381462-bf4a-4a2e-9547-b881eb53f1c1",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "nodeGroups": [],
-  "id": "WF_OUTLOOK",
+  "id": "6YyLXWTY8ZzDQVcx",
   "tags": []
 }

@@ -1,0 +1,378 @@
+{
+  "name": "Leroy Chiedi",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "33628ee0-41f8-465c-a50c-fd66c92c423f",
+      "name": "Avvio",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "122yhgXS8I7WqpTM",
+          "cachedResultName": "Category"
+        },
+        "returnAll": true
+      },
+      "id": "43b2584a-5e27-4847-9584-219294ad274e",
+      "name": "Leggi Categorie",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        304
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $('Avvio').first().json;\n\nconst categorie = $('Leggi Categorie').all().map(i => i.json)\n  .filter(c => c.categoria).map(c => String(c.categoria));\n\n// Il modello deve sapere che giorno e', altrimenti \"a luglio\" non ha senso.\nconst oggi = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });\n\nconst prompt =\n  'Traduci la domanda in un filtro di ricerca. Oggi \\u00e8 ' + oggi + '.\\n\\n' +\n  'Categorie esistenti:\\n' + categorie.join('\\n') + '\\n\\n' +\n  'Domanda: \"' + q.testo + '\"\\n\\n' +\n  'Rispondi solo con JSON:\\n' +\n  '{\"capita\": true|false, \"q\": \"<parole chiave>\"|null,\\n' +\n  ' \"da\": \"YYYY-MM-DD\"|null, \"a\": \"YYYY-MM-DD\"|null,\\n' +\n  ' \"categoria\": \"<una delle categorie>\"|null,\\n' +\n  ' \"tipo\": \"spesa\"|\"entrata\"|null,\\n' +\n  ' \"min\": <numero>|null, \"max\": <numero>|null,\\n' +\n  ' \"aggregazione\": \"totale\"|\"elenco\"|\"per_categoria\"}\\n\\n' +\n  'Regole:\\n' +\n  '- Interpreta il tempo rispetto a oggi. \"luglio\" senza anno \\u00e8 il luglio pi\\u00f9 ' +\n  'recente gi\\u00e0 iniziato. \"questo mese\" \\u00e8 il mese di oggi. \"ultimi tre mesi\" ' +\n  'parte da tre mesi fa e arriva a oggi. \"l anno scorso\" \\u00e8 l anno solare ' +\n  'precedente per intero.\\n' +\n  '- Se non c \\u00e8 alcun riferimento temporale, lascia da e a a null: la ricerca ' +\n  'coprir\\u00e0 tutto lo storico.\\n' +\n  '- aggregazione: \"quanto ho speso\" -> totale. \"cosa\", \"quali\", \"mostrami\", ' +\n  '\"elenca\" -> elenco. \"come ho speso\", \"in cosa\", \"per categoria\" -> ' +\n  'per_categoria.\\n' +\n  '- categoria SOLO se coincide con una dell elenco. Altrimenti null, e le ' +\n  'parole rilevanti finiscono in q.\\n' +\n  '- q contiene il nome di un esercente o di un luogo, mai parole generiche ' +\n  'come \"speso\", \"soldi\", \"spese\". Se non ce n \\u00e8, null.\\n' +\n  '- capita false se la domanda non riguarda movimenti, spese o entrate.';\n\nreturn [{ json: {\n  testo: q.testo,\n  categorie,\n  body_json: JSON.stringify({\n    contents: [{ parts: [{ text: prompt }] }],\n    generationConfig: { responseMimeType: 'application/json' },\n  }),\n}}];"
+      },
+      "id": "6064dbda-e86d-4294-b667-c624e9fae8de",
+      "name": "Prepara domanda",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body_json }}",
+        "options": {}
+      },
+      "id": "2c21aa95-8ecb-4b4d-be82-db869c89940f",
+      "name": "Gemini domanda",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        304
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CRED_HTTPQUERYAUTH",
+          "name": "Gemini - leroy"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Prepara domanda').first().json;\nconst risposta = $('Gemini domanda').first().json;\n\nconst parts = risposta?.candidates?.[0]?.content?.parts || [];\nconst grezzo = parts.map(p => p.text).filter(Boolean).join('')\n  .replace(/\\x60\\x60\\x60json|\\x60\\x60\\x60/g, '').trim();\n\nlet f = null;\ntry { f = JSON.parse(grezzo); } catch { f = null; }\n\nconst fallito = (msg) => [{ json: { errore: msg } }];\n\nif (!f) return fallito('Non sono riuscito a interpretare la domanda. Riprova.');\nif (f.capita === false) {\n  return fallito('Rispondo solo a domande su spese e movimenti. Prova con ' +\n                 '\"quanto ho speso in ristoranti a luglio\".');\n}\n\n// --- validazione di ogni campo ---\nconst ISO = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;\nconst numOrNull = (v) =>\n  (v === null || v === undefined || v === '') ? null\n  : (Number.isFinite(Number(v)) ? Number(v) : null);\n\n// La categoria deve esistere davvero: il confronto e' insensibile alle\n// maiuscole e riconduce al nome esatto della tabella.\nconst cat = prep.categorie.find(c =>\n  c.toLowerCase() === String(f.categoria || '').toLowerCase()) || null;\n\nlet da = ISO.test(String(f.da)) ? String(f.da) : null;\nlet a  = ISO.test(String(f.a))  ? String(f.a)  : null;\nif (da && a && da > a) { const t = da; da = a; a = t; }   // intervallo invertito\n\nconst filtro = {\n  azione: 'cerca',\n  q: f.q ? String(f.q).slice(0, 60) : null,\n  da, a,\n  categoria: cat,\n  tipo: ['spesa', 'entrata'].includes(f.tipo) ? f.tipo : null,\n  min: numOrNull(f.min),\n  max: numOrNull(f.max),\n  limite: 200,\n};\n\n// Un filtro completamente vuoto restituirebbe tutto lo storico: quasi sempre\n// significa che la domanda non e' stata capita.\nconst vuoto = !filtro.q && !filtro.da && !filtro.a && !filtro.categoria &&\n              !filtro.tipo && filtro.min === null && filtro.max === null;\nif (vuoto) return fallito('Non ho capito su cosa cercare. Prova a indicare un ' +\n                          'periodo, una categoria o un nome.');\n\nconst agg = ['totale', 'elenco', 'per_categoria'].includes(f.aggregazione)\n  ? f.aggregazione : 'totale';\n\nreturn [{ json: {\n  aggregazione: agg,\n  filtro,\n  filtro_json: JSON.stringify(filtro),\n}}];"
+      },
+      "id": "c573bc9b-3a07-4731-889d-3bf867528d8b",
+      "name": "Leggi filtro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.filtro_json }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d314cdc9-5b97-41d3-b5fc-f04b79515995",
+      "name": "Filtro valido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "qAzUtRSeCe6wTPEr",
+          "cachedResultName": "Leroy Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "q": "={{ $json.filtro.q }}",
+            "da": "={{ $json.filtro.da }}",
+            "a": "={{ $json.filtro.a }}",
+            "categoria": "={{ $json.filtro.categoria }}",
+            "tipo": "={{ $json.filtro.tipo }}",
+            "min": "={{ String($json.filtro.min ?? '') }}",
+            "max": "={{ String($json.filtro.max ?? '') }}",
+            "limite": "={{ String($json.filtro.limite ?? '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "q",
+              "displayName": "q",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "da",
+              "displayName": "da",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "a",
+              "displayName": "a",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "min",
+              "displayName": "min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "max",
+              "displayName": "max",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "limite",
+              "displayName": "limite",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "4468e1dd-ec74-47b0-b2fe-bcb29892ed51",
+      "name": "Chiama ricerca",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1328,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const f = $('Leggi filtro').first().json;\nconst r = $('Chiama ricerca').first().json || {};\n\nconst eur = (n) => (Math.round(Number(n) * 100) / 100).toFixed(2)\n  .replace('.', ',') + ' \\u20ac';\nconst esc = (s) => String(s)\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst gg = (d) => String(d).slice(8) + '/' + String(d).slice(5, 7);\n\nif (r.ok === false || r.error || !Number.isFinite(Number(r.conteggio))) {\n  return [{ json: { text: 'La ricerca non \\u00e8 riuscita. Riprova fra poco.' } }];\n}\n\nlet t;\n\nif (!r.conteggio) {\n  t = 'Nessun movimento trovato.';\n} else if (f.aggregazione === 'elenco') {\n  const righe = (r.movimenti || []).slice(0, 15).map(m =>\n    gg(m.data) + '  ' + eur(m.importo) + '  ' + esc(m.etichetta || m.categoria));\n  t = '<b>' + r.conteggio + ' movimenti \\u00b7 ' + eur(r.totale) + '</b><br><br>' +\n      righe.join('<br>');\n  if (r.conteggio > 15) t += '<br>\\u2026e altri ' + (r.conteggio - 15);\n} else if (f.aggregazione === 'per_categoria') {\n  const righe = (r.per_categoria || []).slice(0, 12).map(c =>\n    esc(c.nome) + ': ' + eur(c.totale));\n  t = '<b>' + eur(r.totale) + '</b> in ' + r.conteggio + ' movimenti<br><br>' +\n      righe.join('<br>');\n} else {\n  t = '<b>' + eur(r.totale) + '</b><br>' + r.conteggio + ' movimenti';\n}\n\n// Cosa ha capito il modello, sempre in fondo. Senza questa riga un\n// fraintendimento sul periodo produrrebbe un numero sbagliato dall'aria\n// perfettamente credibile.\nconst pezzi = [];\nif (f.filtro.da || f.filtro.a) {\n  pezzi.push((f.filtro.da ? gg(f.filtro.da) + '/' + String(f.filtro.da).slice(0, 4) : 'inizio') +\n             ' \\u2192 ' +\n             (f.filtro.a ? gg(f.filtro.a) + '/' + String(f.filtro.a).slice(0, 4) : 'oggi'));\n} else {\n  pezzi.push('tutto lo storico');\n}\nif (f.filtro.categoria) pezzi.push(esc(f.filtro.categoria));\nif (f.filtro.q) pezzi.push('\"' + esc(f.filtro.q) + '\"');\nif (f.filtro.tipo) pezzi.push(f.filtro.tipo);\n\nt += '<br><br><i>' + pezzi.join(' \\u00b7 ') + '</i>';\n\nreturn [{ json: { text: t.slice(0, 4000) } }];"
+      },
+      "id": "c67b8c8d-f676-46b1-aea6-32cf7cd8db30",
+      "name": "Formatta risposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { text: $json.errore } }];"
+      },
+      "id": "3c31a03f-6d1b-44ac-b919-4df9ac4a1ef6",
+      "name": "Formatta errore",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        432
+      ]
+    }
+  ],
+  "connections": {
+    "Avvio": {
+      "main": [
+        [
+          {
+            "node": "Leggi Categorie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Categorie": {
+      "main": [
+        [
+          {
+            "node": "Prepara domanda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara domanda": {
+      "main": [
+        [
+          {
+            "node": "Gemini domanda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini domanda": {
+      "main": [
+        [
+          {
+            "node": "Leggi filtro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi filtro": {
+      "main": [
+        [
+          {
+            "node": "Filtro valido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro valido?": {
+      "main": [
+        [
+          {
+            "node": "Chiama ricerca",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Formatta errore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chiama ricerca": {
+      "main": [
+        [
+          {
+            "node": "Formatta risposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "0893435f-a13b-4552-8671-fdf3979a6647",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "nodeGroups": [
+    {
+      "id": "ffa5c08f-539e-4fea-a117-9eb84e3f91b2",
+      "name": "Interpreta la domanda",
+      "nodeIds": [
+        "43b2584a-5e27-4847-9584-219294ad274e",
+        "6064dbda-e86d-4294-b667-c624e9fae8de",
+        "2c21aa95-8ecb-4b4d-be82-db869c89940f",
+        "c573bc9b-3a07-4731-889d-3bf867528d8b"
+      ],
+      "description": "Traduce la domanda in un filtro strutturato con Gemini e lo valida campo per campo"
+    }
+  ],
+  "id": "ld4zKayHMlUoTu3X",
+  "tags": []
+}

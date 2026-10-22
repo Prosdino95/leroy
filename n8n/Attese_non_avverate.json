@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "const CHAT_ID = 369010791;\nconst GRAZIA = 3;      // giorni di tolleranza dopo la scadenza\nconst MAX = 5;         // non sommergere di messaggi\n\nconst oggi = new Date();\nconst scadute = $('Leggi Transazioni').all().map(i => i.json)\n  .filter(r => r.data_evento)\n  .filter(r => (oggi - new Date(r.data_evento)) / 86400000 > GRAZIA)\n  .sort((a, b) => String(a.data_evento).localeCompare(String(b.data_evento)))\n  .slice(0, MAX);\n\n\nif (!scadute.length) return [];\n\nreturn scadute.map(r => {\n  const g = String(r.data_evento).slice(8, 10) + '/' + String(r.data_evento).slice(5, 7);\n  const eti = r.esercente || r.note || r.categoria;\n  return { json: {\n      text: '⏳ Addebito non rilevato\\n' +\n            String(r.importo).replace('.', ',') + ' €  ' + eti +\n            '\\nera previsto per il ' + g,\n        inline_keyboard: [\n        { text: 'Registra', callback_data: 'att|' + r.hash_dedup + '|reg' },\n        { text: 'Annulla',  callback_data: 'att|' + r.hash_dedup + '|ann' },\n      ],\n    },\n  };\n});"
+        "jsCode": "const CHAT_ID = 0;\nconst GRAZIA = 3;      // giorni di tolleranza dopo la scadenza\nconst MAX = 5;         // non sommergere di messaggi\n\nconst oggi = new Date();\nconst scadute = $('Leggi Transazioni').all().map(i => i.json)\n  .filter(r => r.data_evento)\n  .filter(r => (oggi - new Date(r.data_evento)) / 86400000 > GRAZIA)\n  .sort((a, b) => String(a.data_evento).localeCompare(String(b.data_evento)))\n  .slice(0, MAX);\n\n\nif (!scadute.length) return [];\n\nreturn scadute.map(r => {\n  const g = String(r.data_evento).slice(8, 10) + '/' + String(r.data_evento).slice(5, 7);\n  const eti = r.esercente || r.note || r.categoria;\n  return { json: {\n      text: '⏳ Addebito non rilevato\\n' +\n            String(r.importo).replace('.', ',') + ' €  ' + eti +\n            '\\nera previsto per il ' + g,\n        inline_keyboard: [\n        { text: 'Registra', callback_data: 'att|' + r.hash_dedup + '|reg' },\n        { text: 'Annulla',  callback_data: 'att|' + r.hash_dedup + '|ann' },\n      ],\n    },\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -19,10 +19,9 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
         "filters": {
           "conditions": [
@@ -47,7 +46,7 @@
     {
       "parameters": {
         "operation": "sendRichMessage",
-        "chatId": "369010791",
+        "chatId": "={{ $json.cfg.chat_id }}",
         "richMessageText": "={{ $json.text }}",
         "replyMarkup": "inlineKeyboard",
         "inlineKeyboard": {
@@ -83,7 +82,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        128,
+        256,
         0
       ],
       "id": "8b0fd8a4-adaa-4f6e-a6cb-13361a570254",
@@ -91,7 +90,7 @@
       "credentials": {
         "telegramApi": {
           "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
+          "name": "Leroy"
         }
       }
     },
@@ -113,21 +112,31 @@
       ],
       "id": "80bd12e1-d4b4-49d5-81b8-63a2ab9ed90d",
       "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "bMZumuoVYedxcdEq",
+          "cachedResultName": "Leroy Config"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "a9fad69c-df51-4439-aec4-8857c9f34aae",
+      "name": "Configura",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        0
+      ]
     }
   ],
-  "pinData": {},
   "connections": {
-    "Attese scadute": {
-      "main": [
-        [
-          {
-            "node": "Send a rich message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Leggi Transazioni": {
       "main": [
         [
@@ -149,22 +158,46 @@
           }
         ]
       ]
+    },
+    "Attese scadute": {
+      "main": [
+        [
+          {
+            "node": "Configura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configura": {
+      "main": [
+        [
+          {
+            "node": "Send a rich message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false,
+    "availableInMCP": true,
     "timeSavedMode": "fixed",
-    "errorWorkflow": "WF_GUARDIANO",
+    "errorWorkflow": "a4E704ffCuZg3kPg",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "29f18f97-46a7-4034-a503-d399038c7788",
+  "versionId": "39d337b1-9734-495c-8365-390c0660265a",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "nodeGroups": [],
-  "id": "WF_ATTESE",
+  "id": "XFj4oGisBsuHi72Q",
   "tags": []
 }

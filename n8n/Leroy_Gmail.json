@@ -30,7 +30,7 @@
       "name": "Gmail Trigger",
       "credentials": {
         "gmailOAuth2": {
-          "id": "CRED_GMAIL",
+          "id": "CRED_GMAILOAUTH2",
           "name": "Gmail account"
         }
       }
@@ -114,9 +114,8 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "WF_PROCESSA_DATI",
+          "value": "R5bQDQB866kBCHeX",
           "mode": "list",
-          "cachedResultUrl": "/workflow/WF_PROCESSA_DATI",
           "cachedResultName": "Leroy Processa Dati"
         },
         "workflowInputs": {
@@ -213,13 +212,12 @@
       "name": "Togli etichetta",
       "credentials": {
         "gmailOAuth2": {
-          "id": "CRED_GMAIL",
+          "id": "CRED_GMAILOAUTH2",
           "name": "Gmail account"
         }
       }
     }
   ],
-  "pinData": {},
   "connections": {
     "Gmail Trigger": {
       "main": [
@@ -299,16 +297,19 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false,
+    "availableInMCP": true,
     "timeSavedMode": "fixed",
-    "errorWorkflow": "WF_GUARDIANO",
-    "callerPolicy": "workflowsFromSameOwner"
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "all"
   },
-  "versionId": "1e78de77-b7a0-4676-b429-3c38062d0fab",
+  "versionId": "02c0e4a4-a88e-49f2-8509-8a58e2ecc23b",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "nodeGroups": [],
-  "id": "WF_GMAIL",
+  "id": "BK0zEJOTLJywTthb",
   "tags": []
 }

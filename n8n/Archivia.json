@@ -24,57 +24,18 @@
     {
       "parameters": {
         "authentication": "serviceAccount",
-        "operation": "clear",
+        "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
           "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "list",
-          "cachedResultName": "Leroy_Data",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+          "cachedResultName": "Leroy_Data"
         },
         "sheetName": {
           "__rl": true,
-          "value": 962791734,
+          "value": "YOUR_SHEET_GID",
           "mode": "list",
-          "cachedResultName": "Transazioni",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=962791734"
-        },
-        "keepFirstRow": true
-      },
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        -480,
-        -16
-      ],
-      "id": "9f23626f-f2e3-46c0-b841-4f4f04b139c3",
-      "name": "Clear sheet",
-      "executeOnce": true,
-      "alwaysOutputData": true,
-      "credentials": {
-        "googleApi": {
-          "id": "CRED_GOOGLE_SERVICE_ACCOUNT",
-          "name": "Google Service Account account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "authentication": "serviceAccount",
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "YOUR_GOOGLE_SHEET_ID",
-          "mode": "list",
-          "cachedResultName": "Leroy_Data",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": 962791734,
-          "mode": "list",
-          "cachedResultName": "Transazioni",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=962791734"
+          "cachedResultName": "Transazioni"
         },
         "columns": {
           "mappingMode": "autoMapInputData",
@@ -242,11 +203,11 @@
         -16
       ],
       "id": "26216df4-bf88-4fbe-95bf-09653a5f4bee",
-      "name": "Riscrivi Transazioni",
+      "name": "Aggiorna Transazioni",
       "retryOnFail": true,
       "credentials": {
         "googleApi": {
-          "id": "CRED_GOOGLE_SERVICE_ACCOUNT",
+          "id": "CRED_GOOGLE",
           "name": "Google Service Account account"
         }
       }
@@ -256,10 +217,19 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "updatedAt",
+              "condition": "gte",
+              "keyValue": "={{ $json.completo ? '1970-01-01T00:00:00.000Z' : $json.da }}"
+            }
+          ]
         },
         "returnAll": true
       },
@@ -270,7 +240,7 @@
         -16
       ],
       "id": "5530a331-0843-4841-ae74-bdf2d2bc7e8e",
-      "name": "Get row(s)"
+      "name": "Leggi Transazioni"
     },
     {
       "parameters": {
@@ -279,9 +249,9 @@
           "__rl": true,
           "value": "WL0zzKbwnzieSs6y",
           "mode": "list",
-          "cachedResultName": "Rules",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/WL0zzKbwnzieSs6y"
-        }
+          "cachedResultName": "Rules"
+        },
+        "returnAll": true
       },
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
@@ -290,7 +260,8 @@
         -16
       ],
       "id": "c39e1525-df42-4163-a5cb-10506af4b086",
-      "name": "Get row(s)1"
+      "name": "Leggi Regole",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -300,15 +271,13 @@
           "__rl": true,
           "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "list",
-          "cachedResultName": "Leroy_Data",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+          "cachedResultName": "Leroy_Data"
         },
         "sheetName": {
           "__rl": true,
-          "value": 802142169,
+          "value": "YOUR_SHEET_GID",
           "mode": "list",
-          "cachedResultName": "Regole",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=802142169"
+          "cachedResultName": "Regole"
         },
         "keepFirstRow": true
       },
@@ -319,12 +288,12 @@
         -16
       ],
       "id": "94ac8a6c-6135-4278-bb04-8f3d150475cf",
-      "name": "Clear sheet1",
+      "name": "Svuota Regole",
       "executeOnce": true,
       "alwaysOutputData": true,
       "credentials": {
         "googleApi": {
-          "id": "CRED_GOOGLE_SERVICE_ACCOUNT",
+          "id": "CRED_GOOGLE",
           "name": "Google Service Account account"
         }
       }
@@ -337,15 +306,13 @@
           "__rl": true,
           "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "list",
-          "cachedResultName": "Leroy_Data",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+          "cachedResultName": "Leroy_Data"
         },
         "sheetName": {
           "__rl": true,
-          "value": 802142169,
+          "value": "YOUR_SHEET_GID",
           "mode": "list",
-          "cachedResultName": "Regole",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=802142169"
+          "cachedResultName": "Regole"
         },
         "columns": {
           "mappingMode": "autoMapInputData",
@@ -412,11 +379,11 @@
         -16
       ],
       "id": "0e79db8c-e191-42a9-a5f5-0094a7e86739",
-      "name": "Riscrivi Transazioni1",
+      "name": "Riscrivi Regole",
       "retryOnFail": true,
       "credentials": {
         "googleApi": {
-          "id": "CRED_GOOGLE_SERVICE_ACCOUNT",
+          "id": "CRED_GOOGLE",
           "name": "Google Service Account account"
         }
       }
@@ -428,9 +395,9 @@
           "__rl": true,
           "value": "beloXwMTxcj50rGi",
           "mode": "list",
-          "cachedResultName": "log",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/beloXwMTxcj50rGi"
-        }
+          "cachedResultName": "log"
+        },
+        "returnAll": true
       },
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
@@ -439,7 +406,8 @@
         -16
       ],
       "id": "2d1dd3d4-ed34-4d00-8abc-c134cad0f6cb",
-      "name": "Get row(s)2"
+      "name": "Leggi Log",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -449,15 +417,13 @@
           "__rl": true,
           "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "list",
-          "cachedResultName": "Leroy_Data",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+          "cachedResultName": "Leroy_Data"
         },
         "sheetName": {
           "__rl": true,
-          "value": 1479282191,
+          "value": "YOUR_SHEET_GID",
           "mode": "list",
-          "cachedResultName": "Log",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1479282191"
+          "cachedResultName": "Log"
         },
         "keepFirstRow": true
       },
@@ -468,12 +434,12 @@
         -16
       ],
       "id": "0b4d73c9-8101-45bb-99da-a2400d36ea5a",
-      "name": "Clear sheet2",
+      "name": "Svuota Log",
       "executeOnce": true,
       "alwaysOutputData": true,
       "credentials": {
         "googleApi": {
-          "id": "CRED_GOOGLE_SERVICE_ACCOUNT",
+          "id": "CRED_GOOGLE",
           "name": "Google Service Account account"
         }
       }
@@ -486,15 +452,13 @@
           "__rl": true,
           "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "list",
-          "cachedResultName": "Leroy_Data",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+          "cachedResultName": "Leroy_Data"
         },
         "sheetName": {
           "__rl": true,
-          "value": 1479282191,
+          "value": "YOUR_SHEET_GID",
           "mode": "list",
-          "cachedResultName": "Log",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1479282191"
+          "cachedResultName": "Log"
         },
         "columns": {
           "mappingMode": "autoMapInputData",
@@ -515,111 +479,308 @@
         -16
       ],
       "id": "37e7eae1-1624-495d-97d6-5a56a6ef1939",
-      "name": "Riscrivi Transazioni2",
+      "name": "Riscrivi Log",
       "retryOnFail": true,
       "credentials": {
         "googleApi": {
-          "id": "CRED_GOOGLE_SERVICE_ACCOUNT",
+          "id": "CRED_GOOGLE",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// La domenica (ora di Roma) si riscrivono tutte le righe, gli altri giorni\n// soltanto quelle modificate negli ultimi due giorni: due giorni e non uno\n// perche' una notte saltata non lasci buchi.\nconst adesso = new Date();\nconst giorno = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Rome', weekday: 'short' }).format(adesso);\nconst completo = giorno === 'Sun';\nconst da = new Date(adesso.getTime() - 2 * 86400000).toISOString();\nreturn [{ json: { completo, da } }];"
+      },
+      "id": "38487dc2-5349-4114-985f-d791793887dc",
+      "name": "Tipo di backup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lo svuotamento restituisce il proprio esito: le righe da scrivere sono\n// quelle lette prima. Un nodo letto a vuoto non ha 'id' e viene scartato.\nreturn $('Leggi Regole').all().filter(i => i.json.id !== undefined);"
+      },
+      "id": "35974ff2-f202-446c-a8d8-abb42d51eba4",
+      "name": "Rilancia Regole",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Leggi Log').all().filter(i => i.json.id !== undefined);"
+      },
+      "id": "90637bb3-1691-432c-a5aa-6fb72a039d37",
+      "name": "Rilancia Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "122yhgXS8I7WqpTM",
+          "cachedResultName": "Category"
+        },
+        "returnAll": true
+      },
+      "id": "4e0a050f-28f8-4d69-9f74-85e37b7e36bb",
+      "name": "Leggi Categorie",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        480
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "cachedResultName": "Leroy_Data"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Categorie"
+        },
+        "keepFirstRow": true
+      },
+      "id": "8a0b1520-39ac-4c04-b5be-4c4087e60bf0",
+      "name": "Svuota Categorie",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        144,
+        480
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleApi": {
+          "id": "CRED_GOOGLE",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Leggi Categorie').all().filter(i => i.json.id !== undefined);"
+      },
+      "id": "f9855492-0576-4ec0-a27c-a99fcdf5d335",
+      "name": "Rilancia Categorie",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "cachedResultName": "Leroy_Data"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Categorie"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "70ac6489-1169-4352-881f-83a5b8e4283c",
+      "name": "Riscrivi Categorie",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        528,
+        480
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googleApi": {
+          "id": "CRED_GOOGLE",
           "name": "Google Service Account account"
         }
       }
     }
   ],
-  "pinData": {},
   "connections": {
+    "Leggi Transazioni": {
+      "main": [
+        [
+          {
+            "node": "Aggiorna Transazioni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Schedule Trigger": {
       "main": [
         [
           {
-            "node": "Clear sheet",
+            "node": "Tipo di backup",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Clear sheet": {
+    "Tipo di backup": {
       "main": [
         [
           {
-            "node": "Get row(s)",
+            "node": "Leggi Transazioni",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Leggi Regole",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Leggi Log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Leggi Categorie",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get row(s)": {
+    "Leggi Regole": {
       "main": [
         [
           {
-            "node": "Riscrivi Transazioni",
+            "node": "Svuota Regole",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Riscrivi Transazioni": {
+    "Svuota Regole": {
       "main": [
         [
           {
-            "node": "Clear sheet1",
+            "node": "Rilancia Regole",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Clear sheet1": {
+    "Rilancia Regole": {
       "main": [
         [
           {
-            "node": "Get row(s)1",
+            "node": "Riscrivi Regole",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get row(s)1": {
+    "Leggi Log": {
       "main": [
         [
           {
-            "node": "Riscrivi Transazioni1",
+            "node": "Svuota Log",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get row(s)2": {
+    "Svuota Log": {
       "main": [
         [
           {
-            "node": "Riscrivi Transazioni2",
+            "node": "Rilancia Log",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Clear sheet2": {
+    "Rilancia Log": {
       "main": [
         [
           {
-            "node": "Get row(s)2",
+            "node": "Riscrivi Log",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Riscrivi Transazioni1": {
+    "Leggi Categorie": {
       "main": [
         [
           {
-            "node": "Clear sheet2",
+            "node": "Svuota Categorie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Svuota Categorie": {
+      "main": [
+        [
+          {
+            "node": "Rilancia Categorie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rilancia Categorie": {
+      "main": [
+        [
+          {
+            "node": "Riscrivi Categorie",
             "type": "main",
             "index": 0
           }
@@ -631,14 +792,19 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "errorWorkflow": "WF_GUARDIANO",
-    "availableInMCP": false
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true
   },
-  "versionId": "d4d6caeb-08c6-4291-83d2-9799ace69fe4",
+  "versionId": "f8a190de-bbc0-4aa1-9887-5e373c5dc9ad",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "nodeGroups": [],
-  "id": "WF_ARCHIVIA",
+  "id": "GVcnIOqqw2XuaRyN",
   "tags": []
 }

@@ -19,8 +19,8 @@
       "name": "Webhook",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CRED_HEADER_AUTH_ANDROID",
-          "name": "Android"
+          "id": "CRED_HTTPHEADERAUTH",
+          "name": "token - accesso - app"
         }
       }
     },
@@ -267,7 +267,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nfunction hash64(str) {\n  let h = 0xcbf29ce484222325n;\n  const p = 0x100000001b3n;\n  for (let i = 0; i < str.length; i++) {\n    h ^= BigInt(str.charCodeAt(i));\n    h = (h * p) & 0xffffffffffffffffn;\n  }\n  return h.toString(16).padStart(16, '0');\n}\n\nfunction uuid() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n  });\n}\n\nconst b = $('Webhook').first().json.body || {};\n\nconst importo = Number(b.importo);\nif (!importo || importo <= 0 || !isFinite(importo)) {\n  return [{ json: { valido: false, errore: 'importo non valido' } }];\n}\n\nconst tipo = b.tipo === 'entrata' ? 'entrata' : 'spesa';\nif (!b.categoria) {\n  return [{ json: { valido: false, errore: 'categoria mancante' } }];\n}\n\nconst data      = String(b.data || new Date().toISOString().slice(0, 10)).slice(0, 10);\nconst esercente = normalizza(b.esercente || '');\nconst conto     = String(b.conto || 'banca');\nconst adesso    = new Date().toISOString();\n\n// L'ultimo elemento fa le veci dell'id_esterno che nelle altre fonti\n// identifica il messaggio. Qui non c'e', e il timestamp garantisce che due\n// inserimenti volutamente identici restino distinti.\nconst hash = hash64([data, importo.toFixed(2), esercente, conto,\n                     'app_' + Date.now()].join('|'));\n\n// Stessa logica di deduplica della pipeline, ma NON scarta: l'utente ha\n// deciso lui di inserirla. Al massimo lo avvisa.\nconst minuti = (x, y) =>\n  Math.abs(new Date(x).getTime() - new Date(y).getTime()) / 60000;\n\nconst simile = $('Leggi Transazioni2').all().map(i => i.json).some(r =>\n  Number(r.importo) === importo &&\n  String(r.conto) === conto &&\n  r.data_inserimento &&\n  minuti(r.data_inserimento, adesso) <= 360\n);\n\nreturn [{ json: {\n  valido: true,\n  duplicato_sospetto: simile,\n  riga: {\n    id: uuid(),\n    data_evento: data,\n    data_inserimento: adesso,\n    fonte: 'app',\n    tipo,\n    importo: importo.toFixed(2),\n    valuta: 'EUR',\n    conto,\n    esercente,\n    categoria: String(b.categoria),\n    sottocategoria: '',\n    note: String(b.note || ''),\n    testo_grezzo: 'inserimento manuale da app',\n    hash_dedup: hash,\n    confidenza: '1.00',\n    stato: 'confermata',\n  },\n}}];"
+        "jsCode": "function normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nfunction hash64(str) {\n  let h = 0xcbf29ce484222325n;\n  const p = 0x100000001b3n;\n  for (let i = 0; i < str.length; i++) {\n    h ^= BigInt(str.charCodeAt(i));\n    h = (h * p) & 0xffffffffffffffffn;\n  }\n  return h.toString(16).padStart(16, '0');\n}\n\nfunction uuid() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n  });\n}\n\nconst b = $('Webhook').first().json.body || {};\n\nconst importo = Number(b.importo);\nif (!importo || importo <= 0 || !isFinite(importo)) {\n  return [{ json: { valido: false, errore: 'importo non valido' } }];\n}\n\nconst tipo = b.tipo === 'entrata' ? 'entrata' : 'spesa';\nif (!b.categoria) {\n  return [{ json: { valido: false, errore: 'categoria mancante' } }];\n}\n\n// Giorno di calendario a Roma, non UTC.\nconst oggiRoma = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });\nconst data      = String(b.data || oggiRoma).slice(0, 10);\nconst esercente = normalizza(b.esercente || '');\nconst conto     = String(b.conto || 'banca');\nconst adesso    = new Date().toISOString();\n\n// L'ultimo elemento fa le veci dell'id_esterno che nelle altre fonti\n// identifica il messaggio. Qui non c'e', e il timestamp garantisce che due\n// inserimenti volutamente identici restino distinti.\nconst hash = hash64([data, importo.toFixed(2), esercente, conto,\n                     'app_' + Date.now()].join('|'));\n\n// La deduplica (e l'avviso di duplicato sospetto) li fa Leroy Scrivi.\nreturn [{ json: {\n  valido: true,\n  riga: {\n    id: uuid(),\n    data_evento: data,\n    data_inserimento: adesso,\n    fonte: 'app',\n    tipo,\n    importo: importo.toFixed(2),\n    valuta: 'EUR',\n    conto,\n    esercente,\n    categoria: String(b.categoria),\n    sottocategoria: '',\n    note: String(b.note || ''),\n    testo_grezzo: 'inserimento manuale da app',\n    hash_dedup: hash,\n    confidenza: '1.00',\n    stato: 'confermata',\n  },\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -314,7 +314,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const p = $('Prepara inserimento').first().json;\nreturn [{ json: {\n  ok: true,\n  hash: p.riga.hash_dedup,\n  duplicato_sospetto: p.duplicato_sospetto,\n}}];"
+        "jsCode": "const s = $json;\nconst p = $('Prepara inserimento').first().json;\nif (s.esito === 'errore') {\n  return [{ json: { ok: false, errore: s.motivo || 'scrittura non riuscita' } }];\n}\nreturn [{ json: {\n  ok: true,\n  hash: p.riga.hash_dedup,\n  duplicato_sospetto: !!s.duplicato_sospetto,\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -434,10 +434,9 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_CATEGORY",
+          "value": "122yhgXS8I7WqpTM",
           "mode": "list",
-          "cachedResultName": "Category",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+          "cachedResultName": "Category"
         },
         "returnAll": true
       },
@@ -455,10 +454,9 @@
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_CATEGORY",
+          "value": "122yhgXS8I7WqpTM",
           "mode": "list",
-          "cachedResultName": "Category",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+          "cachedResultName": "Category"
         },
         "filters": {
           "conditions": [
@@ -567,10 +565,9 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_CATEGORY",
+          "value": "122yhgXS8I7WqpTM",
           "mode": "list",
-          "cachedResultName": "Category",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_CATEGORY"
+          "cachedResultName": "Category"
         },
         "returnAll": true
       },
@@ -589,10 +586,22 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "data_evento",
+              "condition": "like",
+              "keyValue": "={{ $('Webhook').item.json.body.periodo || $now.setZone('Europe/Rome').toFormat('yyyy-MM') }}"
+            },
+            {
+              "keyName": "stato",
+              "keyValue": "attesa"
+            }
+          ]
         },
         "returnAll": true
       },
@@ -611,16 +620,15 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
         "matchType": "allConditions",
         "filters": {
           "conditions": [
             {
-              "keyName": "data_inserimento",
+              "keyName": "data_evento",
               "condition": "like",
               "keyValue": "={{ $('Webhook').item.json.body.periodo }}"
             },
@@ -646,249 +654,17 @@
       ],
       "id": "547deb0d-7c3b-40f1-96c7-ded42bbf5d48",
       "name": "Leggi Transazioni1",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
-          "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "stato",
-              "condition": "neq",
-              "keyValue": "eliminata"
-            },
-            {
-              "keyName": "fonte",
-              "condition": "neq",
-              "keyValue": "app"
-            }
-          ]
-        },
-        "returnAll": true
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        -592,
-        -528
-      ],
-      "id": "dd83cad6-d592-40ef-99b4-5e4192410558",
-      "name": "Leggi Transazioni2",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
-          "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "data_evento": "={{ $json.riga.data_evento }}",
-            "data_inserimento": "={{ $json.riga.data_inserimento }}",
-            "fonte": "={{ $json.riga.fonte }}",
-            "tipo": "={{ $json.riga.tipo }}",
-            "importo": "={{ $json.riga.importo }}",
-            "valuta": "={{ $json.riga.valuta }}",
-            "conto": "={{ $json.riga.conto }}",
-            "esercente": "={{ $json.riga.esercente }}",
-            "categoria": "={{ $json.riga.categoria }}",
-            "sottocategoria": "={{ $json.riga.sottocategoria }}",
-            "note": "={{ $json.riga.note }}",
-            "testo_grezzo": "={{ $json.riga.testo_grezzo }}",
-            "hash_dedup": "={{ $json.riga.hash_dedup }}",
-            "stato": "={{ $json.riga.stato }}",
-            "confidenza": "={{ $json.riga.confidenza }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "data_evento",
-              "displayName": "data_evento",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "data_inserimento",
-              "displayName": "data_inserimento",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "fonte",
-              "displayName": "fonte",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "tipo",
-              "displayName": "tipo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "importo",
-              "displayName": "importo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "valuta",
-              "displayName": "valuta",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "conto",
-              "displayName": "conto",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "esercente",
-              "displayName": "esercente",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "categoria",
-              "displayName": "categoria",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "sottocategoria",
-              "displayName": "sottocategoria",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "note",
-              "displayName": "note",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "testo_grezzo",
-              "displayName": "testo_grezzo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "hash_dedup",
-              "displayName": "hash_dedup",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "confidenza",
-              "displayName": "confidenza",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "stato",
-              "displayName": "stato",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        80,
-        -624
-      ],
-      "id": "9fdf6279-9a40-4a65-aa11-a450da7c401e",
-      "name": "Insert row",
-      "retryOnFail": true
+      "executeOnce": true,
+      "alwaysOutputData": true
     },
     {
       "parameters": {
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
         "filters": {
           "conditions": [
@@ -1081,10 +857,9 @@
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
         "filters": {
           "conditions": [
@@ -1274,11 +1049,11 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
+        "matchType": "allConditions",
         "filters": {
           "conditions": [
             {
@@ -1290,6 +1065,11 @@
               "keyName": "stato",
               "condition": "neq",
               "keyValue": "attesa"
+            },
+            {
+              "keyName": "data_evento",
+              "condition": "gte",
+              "keyValue": "={{ $now.setZone('Europe/Rome').minus({ months: 12 }).toFormat('yyyy-MM') }}"
             }
           ]
         },
@@ -1322,9 +1102,8 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "WF_SEARCH",
+          "value": "qAzUtRSeCe6wTPEr",
           "mode": "list",
-          "cachedResultUrl": "/workflow/WF_SEARCH",
           "cachedResultName": "Leroy Search"
         },
         "workflowInputs": {
@@ -1335,8 +1114,9 @@
             "a": "={{ $json.body.a }}",
             "categoria": "={{ $json.body.categoria }}",
             "tipo": "={{ $json.body.tipo }}",
-            "min": "={{ $json.body.min }}",
-            "max": "={{ $json.body.max }}"
+            "min": "={{ String($json.body.min ?? '') }}",
+            "max": "={{ String($json.body.max ?? '') }}",
+            "limite": "={{ String($json.body.limite ?? '') }}"
           },
           "matchingColumns": [
             "body_firstItem"
@@ -1411,6 +1191,16 @@
               "canBeUsedToMatch": true,
               "type": "string",
               "removed": false
+            },
+            {
+              "id": "limite",
+              "displayName": "limite",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -1426,9 +1216,54 @@
       ],
       "name": "Call Leroy Search",
       "id": "9d0d37a4-5e8c-4d0e-8995-86dc0d3be14b"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6a1f0c52-7b3d-4e8a-9c21-4d5e6f708193",
+              "name": "modo",
+              "value": "diretto",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "00cd1892-fca1-45cd-a51e-7dec4352ffb6",
+      "name": "Modo diretto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        80,
+        -624
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "pA2qDu8chrkJBh7K",
+          "cachedResultName": "Leroy Scrivi"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "0a7c73fa-23e0-480b-b67f-38a1e87f20c2",
+      "name": "Scrivi riga",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        192,
+        -624
+      ]
     }
   ],
-  "pinData": {},
   "connections": {
     "Webhook": {
       "main": [
@@ -1445,7 +1280,7 @@
       "main": [
         [
           {
-            "node": "Leggi Transazioni2",
+            "node": "Prepara inserimento",
             "type": "main",
             "index": 0
           }
@@ -1545,7 +1380,7 @@
       "main": [
         [
           {
-            "node": "Insert row",
+            "node": "Modo diretto",
             "type": "main",
             "index": 0
           }
@@ -1713,28 +1548,6 @@
         ]
       ]
     },
-    "Leggi Transazioni2": {
-      "main": [
-        [
-          {
-            "node": "Prepara inserimento",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Insert row": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Update row(s)1": {
       "main": [
         [
@@ -1789,22 +1602,48 @@
           }
         ]
       ]
+    },
+    "Modo diretto": {
+      "main": [
+        [
+          {
+            "node": "Scrivi riga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrivi riga": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false,
+    "availableInMCP": true,
     "timeSavedMode": "fixed",
-    "errorWorkflow": "WF_GUARDIANO",
-    "callerPolicy": "workflowsFromSameOwner"
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
   },
-  "versionId": "0e92271a-e276-46cc-8411-bf313aa10f0f",
+  "versionId": "a57e0a07-d535-43fe-a73a-c0cdfd9a4e44",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "nodeGroups": [],
-  "id": "WF_APP",
+  "id": "QI3Me7MnxuX8Gw3K",
   "tags": []
 }

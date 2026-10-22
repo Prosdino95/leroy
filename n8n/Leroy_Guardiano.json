@@ -46,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n\n// Quanti giorni di silenzio sono accettabili per ciascuna fonte.\n// Telegram e app non ci sono: sei tu a scriverle, il silenzio è normale.\nconst ATTESO_GG = { push: 7, gmail:30, outlook: 30 };\n\nconst MAX_DA_VERIFICARE = 5;\n\nconst tx = $('Leggi Transazioni').all().map(i => i.json);\nconst oggi = new Date();\nconst gg = (d) => (oggi - new Date(d)) / 86400000;\n\nconst problemi = [];\n\n// --- fonti silenziose ---\nfor (const [fonte, limite] of Object.entries(ATTESO_GG)) {\n  const righe = tx.filter(r => String(r.fonte) === fonte && r.data_inserimento);\n  if (!righe.length) continue;          // fonte mai usata: non è un guasto\n\n  const ultima = righe\n    .map(r => String(r.data_inserimento))\n    .sort()\n    .pop();\n\n  const giorni = Math.floor(gg(ultima));\n  if (giorni > limite) {\n    problemi.push('• ' + fonte + ': nessun movimento da ' + giorni + ' giorni');\n  }\n}\n\n// --- code che si accumulano ---\nconst daVerificare = tx.filter(r => String(r.stato) === 'da_verificare').length;\nif (daVerificare > MAX_DA_VERIFICARE) {\n  problemi.push('• ' + daVerificare + ' movimenti da verificare in attesa');\n}\n\nconst atteseVecchie = tx.filter(r =>\n  String(r.stato) === 'attesa' && r.data_evento && gg(r.data_evento) > 10).length;\nif (atteseVecchie) {\n  problemi.push('• ' + atteseVecchie + ' addebiti previsti scaduti da oltre 10 giorni');\n}\n\n// Nessun problema: silenzio. La conferma che la sentinella funziona arriva\n// dal report settimanale, che elenca lo stato delle fonti.\nif (!problemi.length) return [];\n\nreturn [{ json: {\n    text: '⚠️ Controllo giornaliero\\n\\n' + problemi.join('\\n'),\n}}];"
+        "jsCode": "// Quanti giorni di silenzio sono accettabili per ciascuna fonte.\n// Telegram e app non ci sono: sei tu a scriverle, il silenzio e' normale.\nconst ATTESO_GG = { push: 7, gmail: 30, outlook: 30 };\n// La lettura copre gli ultimi 60 giorni: una fonte senza righe in quella\n// finestra e' silenziosa da almeno tanto.\nconst FINESTRA_GG = 60;\n\nconst MAX_DA_VERIFICARE = 5;\n\nconst tx = $('Leggi Transazioni').all().map(i => i.json).filter(r => r.id !== undefined);\nconst oggi = new Date();\nconst gg = (d) => (oggi - new Date(d)) / 86400000;\n\nconst problemi = [];\n\n// --- fonti silenziose ---\nfor (const [fonte, limite] of Object.entries(ATTESO_GG)) {\n  const righe = tx.filter(r => String(r.fonte) === fonte && r.data_inserimento);\n\n  if (!righe.length) {\n    problemi.push('• ' + fonte + ': nessun movimento da oltre ' + FINESTRA_GG + ' giorni');\n    continue;\n  }\n\n  const ultima = righe\n    .map(r => String(r.data_inserimento))\n    .sort()\n    .pop();\n\n  const giorni = Math.floor(gg(ultima));\n  if (giorni > limite) {\n    problemi.push('• ' + fonte + ': nessun movimento da ' + giorni + ' giorni');\n  }\n}\n\n// --- code che si accumulano ---\nconst daVerificare = tx.filter(r => String(r.stato) === 'da_verificare').length;\nif (daVerificare > MAX_DA_VERIFICARE) {\n  problemi.push('• ' + daVerificare + ' movimenti da verificare in attesa');\n}\n\nconst atteseVecchie = tx.filter(r =>\n  String(r.stato) === 'attesa' && r.data_evento && gg(r.data_evento) > 10).length;\nif (atteseVecchie) {\n  problemi.push('• ' + atteseVecchie + ' addebiti previsti scaduti da oltre 10 giorni');\n}\n\n// Nessun problema: silenzio. La conferma che la sentinella funziona arriva\n// dal report settimanale, che elenca lo stato delle fonti.\nif (!problemi.length) return [];\n\nreturn [{ json: {\n    text: '⚠️ Controllo giornaliero\\n\\n' + problemi.join('\\n'),\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -59,13 +59,50 @@
     },
     {
       "parameters": {
+        "chatId": "={{ $json.cfg.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        -96
+      ],
+      "id": "a50d0bfd-9163-4364-85a6-b28518ad65d7",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "CRED_TELEGRAM",
+          "name": "Leroy"
+        }
+      }
+    },
+    {
+      "parameters": {
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "data_inserimento",
+              "condition": "gte",
+              "keyValue": "={{ $now.minus({ days: 60 }).toISO() }}"
+            },
+            {
+              "keyName": "stato",
+              "keyValue": "da_verificare"
+            },
+            {
+              "keyName": "stato",
+              "keyValue": "attesa"
+            }
+          ]
         },
         "returnAll": true
       },
@@ -76,31 +113,31 @@
         -208
       ],
       "id": "e83449b5-47aa-40a5-8e09-1753a47b464c",
-      "name": "Get row(s)"
+      "name": "Leggi Transazioni"
     },
     {
       "parameters": {
-        "chatId": "369010791",
-        "text": "={{ $json.text }}",
-        "additionalFields": {}
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "bMZumuoVYedxcdEq",
+          "cachedResultName": "Leroy Config"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
+      "id": "0b631690-f3fe-4e34-a8df-4558c1890cb8",
+      "name": "Configura",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
       "position": [
         -624,
-        -112
-      ],
-      "id": "a50d0bfd-9163-4364-85a6-b28518ad65d7",
-      "name": "Send a text message",
-      "credentials": {
-        "telegramApi": {
-          "id": "CRED_TELEGRAM",
-          "name": "Telegram account"
-        }
-      }
+        -96
+      ]
     }
   ],
-  "pinData": {},
   "connections": {
     "Error Trigger": {
       "main": [
@@ -117,7 +154,18 @@
       "main": [
         [
           {
-            "node": "Get row(s)",
+            "node": "Leggi Transazioni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi Transazioni": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
             "type": "main",
             "index": 0
           }
@@ -128,7 +176,7 @@
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Configura",
             "type": "main",
             "index": 0
           }
@@ -139,18 +187,18 @@
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Configura",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get row(s)": {
+    "Configura": {
       "main": [
         [
           {
-            "node": "Code in JavaScript1",
+            "node": "Send a text message",
             "type": "main",
             "index": 0
           }
@@ -162,13 +210,16 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": true,
+    "saveManualExecutions": true
   },
-  "versionId": "0ed80add-61b8-4441-aef2-547a4d002468",
+  "versionId": "22c8bccf-9ee5-4754-99df-285204ad4ea2",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "nodeGroups": [],
-  "id": "WF_GUARDIANO",
+  "id": "a4E704ffCuZg3kPg",
   "tags": []
 }

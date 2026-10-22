@@ -1,0 +1,72 @@
+{
+  "name": "Leroy Config",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "da7d0c26-7bf7-4975-a1aa-b8d63b1bb3be",
+      "name": "Avvio",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Unico posto dove vivono i valori condivisi fra i workflow Leroy.\n// Il dato in ingresso passa invariato: si aggiunge solo la chiave cfg.\nreturn { json: { ...$json, cfg: {\n  chat_id: 0,\n  utente_id: 0,\n  fuso: 'Europe/Rome',\n  conto_default: 'banca',\n  conti: ['banca', 'contante', 'paypal', 'satispay', 'revolut'],\n  finestre: {\n    altra_fonte_ore: 6,\n    stessa_fonte_min: 3,\n    attesa_gg: 12,\n    toll_importo: 0.02,\n  },\n}}};"
+      },
+      "id": "afe0880f-3a91-450c-b7b1-2811be4eee2d",
+      "name": "Configurazione",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        304
+      ]
+    }
+  ],
+  "connections": {
+    "Avvio": {
+      "main": [
+        [
+          {
+            "node": "Configurazione",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "saveManualExecutions": true,
+    "saveDataSuccessExecution": "none",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "a7a0a43a-da08-4174-8f54-4d3a946fad17",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "nodeGroups": [
+    {
+      "id": "e586e81c-4c89-4bf4-902f-552ab5fe4b63",
+      "name": "Configurazione condivisa",
+      "nodeIds": [
+        "afe0880f-3a91-450c-b7b1-2811be4eee2d"
+      ],
+      "description": "Chat id, utente autorizzato, conti e finestre di tolleranza usati da tutti i workflow Leroy"
+    }
+  ],
+  "id": "bMZumuoVYedxcdEq",
+  "tags": []
+}

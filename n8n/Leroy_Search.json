@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "const b = $('Start').first().json || {};\n\nconsole.log(b)\n\nfunction normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nconst q = normalizza(b.q);\nconst parole = q ? q.split(' ').filter(Boolean) : [];\n\nconst tutte = [\n  ...$('Leggi Transazioni4').all().map(i => i.json),];\n\nconst arr = n => Math.round(n * 100) / 100;\n\nconst trovati = tutte.filter(r => {\n  const d = String(r.data_evento).slice(0, 10);\n  if (b.da && d < String(b.da)) return false;\n  if (b.a && d > String(b.a)) return false;\n  if (b.categoria && String(r.categoria) !== String(b.categoria)) return false;\n  if (b.tipo && String(r.tipo) !== String(b.tipo)) return false;\n  const imp = Number(r.importo) || 0;\n  if (b.min != null && imp < Number(b.min)) return false;\n  if (b.max != null && imp > Number(b.max)) return false;\n  if (!parole.length) return true;\n\n  // Tutte le parole devono comparire da qualche parte: cercando\n  // \"bar michele\" non voglio tutti i bar.\n  const testo = normalizza([r.esercente, r.note, r.categoria, r.conto].join(' '));\n  return parole.every(p => testo.includes(p));\n});\n\nconst perCat = {};\nlet totale = 0;\nfor (const r of trovati) {\n  if (String(r.tipo) !== 'spesa') continue;\n  const imp = Number(r.importo) || 0;\n  totale += imp;\n  const c = String(r.categoria || 'Senza categoria');\n  perCat[c] = (perCat[c] || 0) + imp;\n}\n\nconst limite = Math.min(Number(b.limite) || 100, 300);\n\nreturn [{ json: {\n  totale: arr(totale),\n  conteggio: trovati.length,\n  per_categoria: Object.keys(perCat)\n    .map(nome => ({ nome, totale: arr(perCat[nome]) }))\n    .sort((x, y) => y.totale - x.totale),\n  movimenti: trovati\n    .sort((x, y) => String(y.data_evento).localeCompare(String(x.data_evento)))\n    .slice(0, limite)\n    .map(r => ({\n      hash: String(r.hash_dedup || ''),\n      data: String(r.data_evento),\n      importo: Number(r.importo) || 0,\n      tipo: String(r.tipo || 'spesa'),\n      etichetta: String(r.esercente || r.note || ''),\n      categoria: String(r.categoria || ''),\n      conto: String(r.conto || ''),\n      fonte: String(r.fonte || ''),\n      stato: String(r.stato || ''),\n    })),\n}}];"
+        "jsCode": "const b = $('Start').first().json || {};\n\nfunction normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\n// I chiamanti passano i campi come stringhe: un valore assente arriva come\n// '' (o 'null'), non come null. Senza questa normalizzazione max='' diventava\n// Number('') = 0 e il filtro scartava ogni movimento.\nconst txt = v => (v === null || v === undefined || v === 'null' || v === 'undefined')\n  ? '' : String(v).trim();\nconst num = v => {\n  const t = txt(v);\n  return t !== '' && Number.isFinite(Number(t)) ? Number(t) : null;\n};\n\nconst q = normalizza(txt(b.q));\nconst parole = q ? q.split(' ').filter(Boolean) : [];\nconst da = txt(b.da), a = txt(b.a);\nconst categoria = txt(b.categoria), tipo = txt(b.tipo);\nconst min = num(b.min), max = num(b.max);\n\nconst tutte = [\n  ...$('Leggi Transazioni4').all().map(i => i.json),];\n\nconst arr = n => Math.round(n * 100) / 100;\n\nconst trovati = tutte.filter(r => {\n  const d = String(r.data_evento).slice(0, 10);\n  if (da && d < da) return false;\n  if (a && d > a) return false;\n  if (categoria && String(r.categoria) !== categoria) return false;\n  if (tipo && String(r.tipo) !== tipo) return false;\n  const imp = Number(r.importo) || 0;\n  if (min !== null && imp < min) return false;\n  if (max !== null && imp > max) return false;\n  if (!parole.length) return true;\n\n  // Tutte le parole devono comparire da qualche parte: cercando\n  // \"bar michele\" non voglio tutti i bar.\n  const testo = normalizza([r.esercente, r.note, r.categoria, r.conto].join(' '));\n  return parole.every(p => testo.includes(p));\n});\n\nconst perCat = {};\nlet totale = 0;\nfor (const r of trovati) {\n  if (String(r.tipo) !== 'spesa') continue;\n  const imp = Number(r.importo) || 0;\n  totale += imp;\n  const c = String(r.categoria || 'Senza categoria');\n  perCat[c] = (perCat[c] || 0) + imp;\n}\n\nconst limite = Math.min(num(b.limite) || 100, 300);\n\nreturn [{ json: {\n  totale: arr(totale),\n  conteggio: trovati.length,\n  per_categoria: Object.keys(perCat)\n    .map(nome => ({ nome, totale: arr(perCat[nome]) }))\n    .sort((x, y) => y.totale - x.totale),\n  movimenti: trovati\n    .sort((x, y) => String(y.data_evento).localeCompare(String(x.data_evento)))\n    .slice(0, limite)\n    .map(r => ({\n      hash: String(r.hash_dedup || ''),\n      data: String(r.data_evento),\n      importo: Number(r.importo) || 0,\n      tipo: String(r.tipo || 'spesa'),\n      etichetta: String(r.esercente || r.note || ''),\n      categoria: String(r.categoria || ''),\n      conto: String(r.conto || ''),\n      fonte: String(r.fonte || ''),\n      stato: String(r.stato || ''),\n    })),\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -19,10 +19,9 @@
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "value": "DATATABLE_TRANSACTIONS",
+          "value": "sDrCMcErzwHXPTec",
           "mode": "list",
-          "cachedResultName": "Transactions",
-          "cachedResultUrl": "/projects/PROJECT_ID/datatables/DATATABLE_TRANSACTIONS"
+          "cachedResultName": "Transactions"
         },
         "matchType": "allConditions",
         "filters": {
@@ -30,12 +29,32 @@
             {
               "keyName": "stato",
               "condition": "neq",
-              "keyValue": "=eliminata"
+              "keyValue": "eliminata"
             },
             {
               "keyName": "stato",
               "condition": "neq",
-              "keyValue": "=attesa"
+              "keyValue": "attesa"
+            },
+            {
+              "keyName": "data_evento",
+              "condition": "gte",
+              "keyValue": "={{ ['', 'null', 'undefined'].includes(String($json.da ?? '')) ? '0000-00-00' : String($json.da) }}"
+            },
+            {
+              "keyName": "data_evento",
+              "condition": "lte",
+              "keyValue": "={{ ['', 'null', 'undefined'].includes(String($json.a ?? '')) ? '9999-99-99' : String($json.a) }}"
+            },
+            {
+              "keyName": "categoria",
+              "condition": "like",
+              "keyValue": "={{ ['', 'null', 'undefined'].includes(String($json.categoria ?? '')) ? '%' : String($json.categoria) }}"
+            },
+            {
+              "keyName": "tipo",
+              "condition": "like",
+              "keyValue": "={{ ['', 'null', 'undefined'].includes(String($json.tipo ?? '')) ? '%' : String($json.tipo) }}"
             }
           ]
         },
@@ -75,6 +94,9 @@
             },
             {
               "name": "max"
+            },
+            {
+              "name": "limite"
             }
           ]
         }
@@ -89,7 +111,6 @@
       ]
     }
   ],
-  "pinData": {},
   "connections": {
     "Leggi Transazioni4": {
       "main": [
@@ -118,12 +139,18 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "errorWorkflow": "WF_GUARDIANO",
-    "availableInMCP": false
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true
   },
-  "versionId": "b60c624d-3d1c-4751-90d9-a2c2d3866971",
-  "meta": {},
+  "versionId": "07662411-b43c-482c-afcd-f37a66c7a0fc",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
   "nodeGroups": [],
-  "id": "WF_SEARCH",
+  "id": "qAzUtRSeCe6wTPEr",
   "tags": []
 }

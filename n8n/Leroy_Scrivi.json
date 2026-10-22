@@ -1,0 +1,804 @@
+{
+  "name": "Leroy Scrivi",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "6b34a003-91a0-42c4-bf56-11a679ed0f90",
+      "name": "Avvio",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "bMZumuoVYedxcdEq",
+          "cachedResultName": "Leroy Config"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "803a37b9-0da3-4550-9779-73fc01310028",
+      "name": "Configura",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const r = $json.riga || {};\nconst errori = [];\nif (!(Number(r.importo) > 0)) errori.push('importo non valido');\nif (!r.hash_dedup) errori.push('hash mancante');\nif (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(r.data_evento || ''))) errori.push('data_evento non ISO');\nreturn { json: { ...$json, modo: $json.modo === 'diretto' ? 'diretto' : 'pipeline', errori } };"
+      },
+      "id": "1b340f90-be25-4e61-853b-e72b8c5890e7",
+      "name": "Valida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.errori.length === 0 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f160f2e2-8660-4a02-964a-4ec97cb057ca",
+      "name": "Dati validi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "sDrCMcErzwHXPTec",
+          "cachedResultName": "Transactions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "hash_dedup",
+              "keyValue": "={{ $json.riga.hash_dedup }}"
+            }
+          ]
+        },
+        "limit": 5
+      },
+      "id": "dd4f255e-4cef-4aa8-ad68-aa8140b051eb",
+      "name": "Cerca hash",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        368
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "sDrCMcErzwHXPTec",
+          "cachedResultName": "Transactions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "stato",
+              "keyValue": "attesa"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "f5c5b876-4d84-46b9-890e-2b5957e77cf9",
+      "name": "Leggi attese",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1184,
+        368
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "sDrCMcErzwHXPTec",
+          "cachedResultName": "Transactions"
+        },
+        "limit": 300,
+        "orderBy": true,
+        "orderByColumn": "id"
+      },
+      "id": "e125ef8b-2b33-4a9b-83ca-6871311558fc",
+      "name": "Leggi recenti",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1408,
+        368
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst c = $('Valida').first().json;\nconst F = c.cfg.finestre;\nconst nuova = c.riga;\nconst avviso = c.avviso || '';\nconst modo = c.modo;\n\n// Le tre letture si sovrappongono: si toglie il doppione per id.\nconst visti = {};\nconst esistenti = [\n  ...$('Cerca hash').all(),\n  ...$('Leggi attese').all(),\n  ...$('Leggi recenti').all(),\n].map(i => i.json).filter(r => {\n  if (!r || r.id === undefined || visti[r.id]) return false;\n  visti[r.id] = true;\n  return true;\n});\n\nconst minuti = (a, b) =>\n  Math.abs(new Date(a).getTime() - new Date(b).getTime()) / 60000;\nconst giorni = (a, b) =>\n  Math.abs(new Date(a).getTime() - new Date(b).getTime()) / 86400000;\nconst eImporto = String(nuova.importo).replace('.', ',');\nconst gg = (d) => String(d).slice(8, 10) + '/' + String(d).slice(5, 7);\nconst rispondi = (o) => [{ json: { riga: nuova, avviso, modo, motivo: '', testo: '', ...o } }];\n\n// 1) Lo stesso messaggio e' gia' stato scritto (vale per ogni modo).\nif (esistenti.some(r => String(r.hash_dedup) === nuova.hash_dedup)) {\n  return rispondi({ esito: 'scarta', motivo: 'gia processata' });\n}\n\n// 2) Inserimento diretto (Telegram, app): l'utente ha deciso lui, si scrive\n//    sempre. Si segnala soltanto se esiste una riga molto simile.\nif (modo === 'diretto') {\n  const sospetto = esistenti.some(r =>\n    String(r.stato) !== 'eliminata' &&\n    String(r.fonte) !== 'app' &&\n    Number(r.importo) === Number(nuova.importo) &&\n    String(r.conto) === String(nuova.conto) &&\n    r.data_inserimento &&\n    minuti(r.data_inserimento, nuova.data_inserimento) <= 360);\n  return rispondi({ esito: 'scrivi', duplicato_sospetto: sospetto });\n}\n\n// 3) La nuova riga e' un ANNUNCIO: l'unico rischio e' il sollecito, cioe'\n//    una seconda mail che riannuncia lo stesso addebito.\nif (nuova.stato === 'attesa') {\n  const giaAttesa = esistenti.find(r =>\n    String(r.stato) === 'attesa' &&\n    Math.abs(Number(r.importo) - Number(nuova.importo)) <= F.toll_importo &&\n    r.data_evento &&\n    giorni(r.data_evento, nuova.data_evento) <= F.attesa_gg);\n\n  if (giaAttesa) {\n    return rispondi({ esito: 'scarta', motivo: 'attesa gia registrata per il ' + String(giaAttesa.data_evento) });\n  }\n  return rispondi({\n    esito: 'scrivi',\n    testo: 'Addebito previsto' + NL +\n      eImporto + ' \\u20ac  ' + nuova.categoria +\n      (nuova.esercente ? NL + nuova.esercente : '') +\n      NL + 'atteso per il ' + gg(nuova.data_evento),\n  });\n}\n\n// 4) Addebito reale: prima i duplicati. Attese ed eliminate non partecipano.\nconst confrontabili = esistenti.filter(r =>\n  !['attesa', 'eliminata'].includes(String(r.stato)) &&\n  Number(r.importo) === Number(nuova.importo) &&\n  String(r.conto) === String(nuova.conto) &&\n  r.data_inserimento);\n\nconst daAltraFonte = confrontabili.find(r =>\n  String(r.fonte) !== String(nuova.fonte) &&\n  minuti(r.data_inserimento, nuova.data_inserimento) <= F.altra_fonte_ore * 60);\n\nconst stessaFonte = confrontabili.find(r =>\n  String(r.fonte) === String(nuova.fonte) &&\n  minuti(r.data_inserimento, nuova.data_inserimento) <= F.stessa_fonte_min);\n\nconst gemello = daAltraFonte || stessaFonte;\nif (gemello) {\n  return rispondi({\n    esito: 'scarta',\n    motivo: 'duplicato di ' + gemello.fonte + ' delle ' + String(gemello.data_inserimento).slice(11, 16),\n  });\n}\n\n// 5) Chiude un'attesa registrata in precedenza?\nconst candidate = esistenti\n  .filter(r =>\n    String(r.stato) === 'attesa' &&\n    Math.abs(Number(r.importo) - Number(nuova.importo)) <= F.toll_importo &&\n    r.data_evento &&\n    giorni(r.data_evento, nuova.data_evento) <= F.attesa_gg)\n  .sort((a, b) =>\n    giorni(a.data_evento, nuova.data_evento) - giorni(b.data_evento, nuova.data_evento));\n\nif (candidate.length) {\n  const att = candidate[0];\n  return rispondi({\n    esito: 'riconcilia',\n    chiave: String(att.hash_dedup),\n    testo: '\\u2713 Addebito previsto concluso' + NL +\n      eImporto + ' \\u20ac  ' + att.categoria +\n      (att.esercente ? NL + att.esercente : '') +\n      NL + 'atteso per il ' + gg(att.data_evento) +\n      (candidate.length > 1 ? NL + '\\u26a0 ' + candidate.length + ' attese compatibili' : ''),\n  });\n}\n\n// 6) Nessuna delle precedenti: e' una spesa nuova.\nconst segno = nuova.tipo === 'entrata' ? '+' : '\\u2212';\nreturn rispondi({\n  esito: 'scrivi',\n  testo: (nuova.stato === 'da_verificare' ? '\\u26a0 Importo da verificare' + NL : '') +\n    segno + ' ' + eImporto + ' \\u20ac  ' + nuova.categoria +\n    (nuova.esercente ? NL + nuova.esercente : '') +\n    NL + nuova.conto + '  (da ' + nuova.fonte + ')' +\n    (avviso ? NL + avviso : ''),\n});"
+      },
+      "id": "eb7521a8-d88b-4cd7-a001-065c561fd880",
+      "name": "Decidi",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.esito }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "scarta"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "scarta"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.esito }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "scrivi"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "scrivi"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.esito }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "riconcilia"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "riconcilia"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "80dc5f04-fa6e-4ca1-99c4-a61d018e18fa",
+      "name": "Esito",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1424,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "beloXwMTxcj50rGi",
+          "cachedResultName": "log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "livello": "duplicato",
+            "messaggio": "={{ $json.motivo }} — {{ $json.riga.importo }} € {{ $json.riga.esercente }} ({{ $json.riga.fonte }})"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "livello",
+              "displayName": "livello",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "messaggio",
+              "displayName": "messaggio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "bdb280bd-9a90-4b4f-9e05-63e47baa296d",
+      "name": "Log duplicato",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1808,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Decidi').first().json;\nconst mappa = { scarta: 'scartata', scrivi: 'scritta', riconcilia: 'riconciliata' };\nreturn [{ json: {\n  esito: mappa[d.esito] || 'errore',\n  motivo: d.motivo || '',\n  testo: d.testo || '',\n  duplicato_sospetto: !!d.duplicato_sospetto,\n  hash: d.riga.hash_dedup,\n  riga: d.riga,\n} }];"
+      },
+      "id": "6de46cee-aece-4171-ac05-e0fb8fd544e3",
+      "name": "Risposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2176,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "sDrCMcErzwHXPTec",
+          "cachedResultName": "Transactions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data_evento": "={{ $json.riga.data_evento }}",
+            "data_inserimento": "={{ $json.riga.data_inserimento }}",
+            "fonte": "={{ $json.riga.fonte }}",
+            "tipo": "={{ $json.riga.tipo }}",
+            "importo": "={{ $json.riga.importo }}",
+            "valuta": "={{ $json.riga.valuta }}",
+            "conto": "={{ $json.riga.conto }}",
+            "esercente": "={{ $json.riga.esercente }}",
+            "categoria": "={{ $json.riga.categoria }}",
+            "sottocategoria": "={{ $json.riga.sottocategoria }}",
+            "note": "={{ $json.riga.note }}",
+            "testo_grezzo": "={{ $json.riga.testo_grezzo }}",
+            "hash_dedup": "={{ $json.riga.hash_dedup }}",
+            "stato": "={{ $json.riga.stato }}",
+            "confidenza": "={{ $json.riga.confidenza }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number"
+            },
+            {
+              "id": "valuta",
+              "displayName": "valuta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "esercente",
+              "displayName": "esercente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "sottocategoria",
+              "displayName": "sottocategoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "testo_grezzo",
+              "displayName": "testo_grezzo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "hash_dedup",
+              "displayName": "hash_dedup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number"
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "3c6acf86-baed-44ac-b427-8607a641af11",
+      "name": "Scrivi riga",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1712,
+        368
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "sDrCMcErzwHXPTec",
+          "cachedResultName": "Transactions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "hash_dedup",
+              "keyValue": "={{ $json.chiave }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "importo": "={{ $json.riga.importo }}",
+            "data_evento": "={{ $json.riga.data_evento }}",
+            "data_inserimento": "={{ $json.riga.data_inserimento }}",
+            "fonte": "={{ $json.riga.fonte }}",
+            "conto": "={{ $json.riga.conto }}",
+            "confidenza": 1,
+            "stato": "confermata"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "importo",
+              "displayName": "importo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number"
+            },
+            {
+              "id": "data_evento",
+              "displayName": "data_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "data_inserimento",
+              "displayName": "data_inserimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "fonte",
+              "displayName": "fonte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "conto",
+              "displayName": "conto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "confidenza",
+              "displayName": "confidenza",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number"
+            },
+            {
+              "id": "stato",
+              "displayName": "stato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f67476be-ece6-4ef2-a997-1f6fe63a645b",
+      "name": "Chiudi attesa",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1808,
+        416
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { esito: 'errore', motivo: $json.errori.join(', '), testo: '', duplicato_sospetto: false, hash: '', riga: $json.riga || null } };"
+      },
+      "id": "9180392f-5a4d-4050-bacf-3e5abcde1a68",
+      "name": "Risposta errore",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        416
+      ]
+    }
+  ],
+  "connections": {
+    "Avvio": {
+      "main": [
+        [
+          {
+            "node": "Configura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configura": {
+      "main": [
+        [
+          {
+            "node": "Valida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valida": {
+      "main": [
+        [
+          {
+            "node": "Dati validi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dati validi?": {
+      "main": [
+        [
+          {
+            "node": "Cerca hash",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Risposta errore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerca hash": {
+      "main": [
+        [
+          {
+            "node": "Leggi attese",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi attese": {
+      "main": [
+        [
+          {
+            "node": "Leggi recenti",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi recenti": {
+      "main": [
+        [
+          {
+            "node": "Decidi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decidi": {
+      "main": [
+        [
+          {
+            "node": "Esito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esito": {
+      "main": [
+        [
+          {
+            "node": "Log duplicato",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Scrivi riga",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chiudi attesa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log duplicato": {
+      "main": [
+        [
+          {
+            "node": "Risposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrivi riga": {
+      "main": [
+        [
+          {
+            "node": "Risposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chiudi attesa": {
+      "main": [
+        [
+          {
+            "node": "Risposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "errorWorkflow": "a4E704ffCuZg3kPg",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "0460c09a-6e9e-446b-be42-7fbd64bf1751",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "nodeGroups": [
+    {
+      "id": "24edb405-52f3-414a-a58a-1621f8c980cf",
+      "name": "Controllo duplicati",
+      "nodeIds": [
+        "dd4f255e-4cef-4aa8-ad68-aa8140b051eb",
+        "f5c5b876-4d84-46b9-890e-2b5957e77cf9",
+        "e125ef8b-2b33-4a9b-83ca-6871311558fc",
+        "eb7521a8-d88b-4cd7-a001-065c561fd880"
+      ],
+      "description": "Cerca hash, attese e ultime 300 righe, poi decide se scartare, riconciliare o scrivere"
+    },
+    {
+      "id": "b4b34792-fe90-45eb-9cfb-7c0d1ab9b93b",
+      "name": "Scrittura",
+      "nodeIds": [
+        "3c6acf86-baed-44ac-b427-8607a641af11"
+      ],
+      "description": "Inserisce la riga in Transactions"
+    }
+  ],
+  "id": "pA2qDu8chrkJBh7K",
+  "tags": []
+}
