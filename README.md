@@ -27,8 +27,6 @@ inserisci in due secondi da un bot Telegram o dall'app.
 - **Riconciliazione degli addebiti annunciati**: una bolletta comunicata oggi e
   addebitata fra due settimane resta una spesa sola, contata quando i soldi
   escono davvero
-- **Riconoscimento delle ricorrenze**: gli abbonamenti si deducono dallo
-  storico, e il sistema avvisa quando uno salta o rincara
 - **Sorveglianza di sé stesso**: gli errori e le fonti che smettono di
   produrre dati vengono segnalati invece di passare inosservati
 - **Report settimanali e mensili** con confronti sullo storico
@@ -51,7 +49,7 @@ flowchart TD
     I1 --> P[Elaborazione condivisa]
     I2 --> P
 
-    P --> S[(Google Sheet)]
+    P --> S[(Data table<br/>di n8n)]
     W1 --> S
     API --> S
 
@@ -61,6 +59,7 @@ flowchart TD
     W1 -.conferme.-> C
     G[Sorveglianza<br/>e report] --> S
     G -.avvisi.-> C
+    S -.copia notturna.-> B[(Google Sheet<br/>di backup)]
 ```
 
 Il sistema ha cinque strati.
@@ -74,19 +73,22 @@ da qualsiasi ingestore, ne estrae importo, esercente e categoria, verifica che
 non sia un duplicato e scrive. Aggiungere una fonte nuova significa scrivere un
 ingestore, non toccare la logica.
 
-**Lo storage** è un Google Sheet. È una scelta deliberata: i dati restano
-leggibili e modificabili anche senza il sistema, si aprono dal telefono, si
-esportano in un clic. Nessun lock-in.
+**Lo storage** sono quattro data table di n8n: movimenti, categorie, regole
+apprese, log. Stanno nel database di n8n e si interrogano con filtri lato
+server, quindi nessun workflow deve scaricare lo storico per intero. Ogni
+notte una copia viene scritta su un Google Sheet: resta leggibile e
+modificabile anche senza il sistema, si apre dal telefono, si esporta in un
+clic. Non è la fonte della verità, è la scialuppa.
 
 **Le interfacce** sono due. Il bot Telegram per l'inserimento rapido, le
 conferme e le domande; una PWA per la consultazione. La PWA non conosce lo
-storage: parla con un'API che espone il foglio, quindi cambiare il database
+storage: parla con un'API che espone i dati, quindi cambiare il database
 sottostante non la toccherebbe.
 
 **La sorveglianza** è l'ultimo strato, ed è quello che rende il sistema
 affidabile: controlla che le fonti continuino a produrre, che gli addebiti
-previsti si presentino, che le ricorrenze non saltino, e riporta gli errori
-invece di lasciarli morire in un log che nessuno legge.
+previsti si presentino, e riporta gli errori invece di lasciarli morire in un
+log che nessuno legge.
 
 ### Il percorso di un movimento
 
@@ -172,9 +174,10 @@ leroy/
 ├── docs/
 │   ├── installazione.md   dal server vuoto al sistema in funzione
 │   ├── api.md             contratto dell'API usata dalla PWA
-│   └── schema-dati.md     fogli, colonne e semantica
+│   └── schema-dati.md     data table, colonne e semantica
 └── scripts/
-    └── migra_1money.py    migrazione dello storico
+    ├── migra_1money.py         migrazione dello storico
+    └── controlla_json_n8n.py   cerca secret ed endpoint negli export, da lanciare prima del commit
 ```
 
 ---
@@ -187,7 +190,8 @@ leroy/
 | n8n Community self-hosted | automazione | 0 |
 | Caddy | reverse proxy e TLS automatico | 0 |
 | PostgreSQL | database di n8n | 0 |
-| Google Sheets | storage dei dati | 0 |
+| Data table di n8n | storage dei dati | 0 |
+| Google Sheets | copia notturna di sicurezza (facoltativa) | 0 |
 | Google Gemini API | categorizzazione e ricerca, piano gratuito | 0 |
 | Bot Telegram | inserimento, notifiche, domande | 0 |
 | MacroDroid (Android) | cattura delle notifiche bancarie | 0 |
@@ -207,8 +211,10 @@ In sintesi:
    quello del sistema operativo
 2. Punta un nome DNS sull'IP pubblico
 3. Copia `infra/`, compila `.env` partendo da `.env.example`, avvia lo stack
-4. Crea il Google Sheet e migra lo storico con `scripts/migra_1money.py`
-5. Configura le credenziali in n8n e importa i workflow da `n8n/`
+4. Crea le quattro data table in n8n (e, se vuoi il backup, il Google Sheet) e
+   migra lo storico con `scripts/migra_1money.py`
+5. Configura le credenziali in n8n e importa i workflow da `n8n/`, sostituendo i
+   segnaposto
 6. Copia `app/` nella cartella servita da Caddy
 
 Al primo avvio la PWA chiede indirizzo dell'API e token: restano solo sul
@@ -238,6 +244,12 @@ nemmeno in uscita.
 con autenticazione a due fattori sul pannello, e non riusare lo stesso token
 per endpoint diversi.
 
+**Prima di committare gli export dei workflow** lancia
+`python scripts/controlla_json_n8n.py n8n/*.json`: cerca endpoint dei webhook,
+id di fogli e cartelle, chat id, `instanceId` e simili. Con `--pulisci cartella`
+scrive copie con i segnaposto. Le credenziali vere n8n non le esporta, ma gli
+identificativi sì.
+
 L'app ha anche una **modalità privacy** che maschera tutti gli importi con un
 tocco: serve a poter mostrare l'interfaccia a qualcuno senza rivelare le cifre.
 Non è una misura di sicurezza — i dati restano in memoria — ma copre il caso
@@ -248,8 +260,8 @@ per cui è pensata.
 ## Backup
 
 `infra/backup.sh`, da mettere in cron settimanale, produce un archivio con il
-dump del database, i workflow in formato leggibile e la configurazione dello
-stack. Si segnala su Telegram se fallisce, e si rifiuta di produrre un archivio
+dump del database (dove stanno anche le data table), i workflow in formato
+leggibile e la configurazione dello stack. Si segnala su Telegram se fallisce, e si rifiuta di produrre un archivio
 se il dump risulta vuoto.
 
 Due avvertenze che valgono più dello script:
@@ -275,8 +287,10 @@ prima di averne bisogno.
 - La riconciliazione di un addebito annunciato si basa su importo e data
   prevista: due addebiti di pari importo attesi nello stesso periodo possono
   essere scambiati.
-- Il riconoscimento delle ricorrenze produce qualche falso positivo: gli
-  esercenti frequentati con regolarità vanno esclusi a mano.
+- Se due canali segnalano lo stesso addebito nello stesso istante, entrambi
+  possono scriverlo: la finestra è piccola ma non nulla.
+- Il bot Telegram propone i bottoni delle categorie solo con esattamente venti
+  categorie di spesa; con un numero diverso risponde senza bottoni.
 - Il budget per categoria è un valore unico, non storicizzato: modificandolo
   cambia anche il confronto con i mesi passati.
 - Non esiste il concetto di giroconto: spostare denaro fra due conti propri

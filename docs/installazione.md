@@ -16,7 +16,8 @@ Serve:
   ma con meno di 2 GB conviene rinunciare a PostgreSQL e restare su SQLite
 - un nome DNS che risolva sul suo IP pubblico: va bene un servizio DNS
   dinamico gratuito
-- un account Google (foglio, chiave del modello linguistico)
+- un account Google (chiave del modello linguistico e, se vuoi il backup su
+  foglio, un Google Sheet)
 - un telefono Android, se vuoi la raccolta dalle notifiche bancarie
 
 Il sistema è pensato per stare interamente su piani gratuiti. Le VM ARM sempre
@@ -142,18 +143,35 @@ vedi `localhost`, la variabile `WEBHOOK_URL` non è stata letta.
 
 ---
 
-## 5. Il foglio dati
+## 5. Le data table
 
-Crea un Google Sheet con sette fogli: `Transazioni`, `Archivio`, `Categorie`,
-`Regole`, `Ricorrenti`, `Conti`, `Log`. Colonne e semantica sono in
-[`schema-dati.md`](schema-dati.md).
+I dati vivono in quattro data table di n8n (sezione *Data tables* del progetto).
+Creale **prima** di aprire i workflow: i nodi risolvono le colonne al
+caricamento. Colonne e semantica sono in [`schema-dati.md`](schema-dati.md).
 
-`Archivio` ha la stessa struttura di `Transazioni` e all'inizio resta vuoto:
-ci si spostano gli anni chiusi quando le letture cominciano a farsi lente.
+| Tabella | Colonne da creare |
+|---|---|
+| `Transactions` | `data_evento` · `data_inserimento` · `fonte` · `tipo` · `importo` (numero) · `valuta` · `conto` · `esercente` · `categoria` · `sottocategoria` · `note` · `testo_grezzo` · `hash_dedup` · `confidenza` (numero) · `stato` |
+| `Category` | `categoria` · `tipo` · `budget_mensile` (numero) |
+| `Rules` | `pattern` · `categoria` · `conto` · `creata_il` · `utilizzi` (numero) |
+| `log` | `livello` · `messaggio` |
 
-Formatta la colonna `importo` come **Testo normale** in entrambi i fogli dei
-movimenti, altrimenti il locale italiano interpreterà valori come `6.00` come
-orari.
+Le altre colonne sono testo. L'`id` è assegnato da n8n, non va creato.
+
+Popola `Category` con l'elenco delle categorie. È un elenco **chiuso**: una
+categoria che non c'è viene rifiutata dalla validazione, e il movimento nasce
+`da_verificare`. Il bot Telegram propone i bottoni solo con esattamente 20
+categorie di spesa; con un numero diverso risponde senza bottoni.
+
+### Il foglio di backup (facoltativo)
+
+Se vuoi la copia notturna, crea un Google Sheet con quattro schede,
+`Transazioni`, `Regole`, `Log` e `Categorie`. Possono essere vuote: `Archivia`
+scrive anche le intestazioni. Non serve formattare nulla: i nodi scrivono i
+valori senza interpretarli.
+
+I dati stanno già nel database di n8n, che il passo 13 mette al sicuro: il foglio
+è una seconda copia, comoda da consultare, non la fonte.
 
 ---
 
@@ -165,9 +183,10 @@ Se arrivi da un'altra app, esporta in CSV e converti:
 python scripts/migra_1money.py export.csv transazioni.csv
 ```
 
-Lo script produce anche un riepilogo statistico per categoria, utile per
-impostare i budget su dati reali. Importa i due CSV nei fogli `Transazioni` e
-`Categorie` con *File → Importa → Sostituisci foglio*.
+Importa il CSV nella data table `Transactions` con l'importazione CSV di n8n.
+Salta la colonna `id` del CSV, perché l'`id` lo assegna n8n. Le categorie
+distinte che compaiono nello storico vanno inserite in `Category` a mano o dal
+riepilogo che lo script stampa; i budget si impostano poi dall'app.
 
 Verifica che la differenza fra entrate e uscite coincida col saldo dell'app di
 origine: se torna al centesimo, non si è perso nulla.
@@ -178,12 +197,12 @@ origine: se torna al centesimo, non si è perso nulla.
 
 In n8n, sezione Credentials.
 
-**Google Sheets** — usa un **service account**, non OAuth. Le applicazioni
-Google in stato di test hanno un token di aggiornamento che scade dopo sette
-giorni: con OAuth il sistema si romperebbe ogni settimana. Crea il service
-account nella console cloud, scarica la chiave JSON, e **condividi il foglio
-con l'indirizzo del service account** come editor — è il passaggio che salta
-a tutti.
+**Google Sheets** (solo se usi il backup) — usa un **service account**, non
+OAuth. Le applicazioni Google in stato di test hanno un token di aggiornamento
+che scade dopo sette giorni: con OAuth il backup si romperebbe ogni settimana.
+Crea il service account nella console cloud, scarica la chiave JSON, e
+**condividi il foglio con l'indirizzo del service account** come editor — è il
+passaggio che salta a tutti.
 
 **Modello linguistico** — una credenziale di tipo *Query Auth* con nome del
 parametro `key` e come valore la chiave API. Il nome del parametro è `key`,
@@ -203,24 +222,33 @@ gli endpoint di autorizzazione devono usare `/consumers`, non `/common`:
 l'authority deve corrispondere al tipo di account, o l'autenticazione viene
 rifiutata prima ancora della schermata di login.
 
-**Header Auth** — una credenziale per ciascun webhook in ingresso, con token
-diversi generati con `openssl rand -hex 32`.
+**Header Auth** — una credenziale per ciascun webhook in ingresso (app e
+notifiche Android), con nome dell'header `X-Push-Token` e token diversi
+generati con `openssl rand -hex 32`.
 
 ---
 
 ## 8. I workflow
 
-Importa i JSON da `n8n/` seguendo le indicazioni in
-[`../n8n/README.md`](../n8n/README.md). Ricollega le credenziali e correggi i
-riferimenti al documento Google, che puntano al foglio dell'installazione
-originale.
+Importa i JSON da `n8n/` (menu del workflow → *Import from File*), poi
+ricollega le credenziali e sostituisci i segnaposto: gli export non contengono
+né id di fogli, etichette e cartelle, né i percorsi dei webhook, né i tuoi
+identificativi Telegram. L'elenco completo è in
+[`../n8n/README.md`](../n8n/README.md).
 
-**Attiva prima il workflow di elaborazione, poi gli ingestori**: un richiamo
-verso un workflow inattivo fallisce.
+**Importa e attiva prima i sotto-workflow, poi tutto il resto**: un richiamo
+verso un workflow inattivo fallisce. L'ordine:
 
-Poi, nelle impostazioni di **ogni** workflow, imposta `guardiano` come *Error
-Workflow* — tranne che nel guardiano stesso. È il passaggio più noioso e il più
-facile da dimenticare: se ne salti uno, i suoi errori restano invisibili.
+1. `Leroy Config`, `Leroy Scrivi`, `Leroy Search`, `Leroy Chiedi`
+2. `Leroy Processa Dati`
+3. gli ingestori, il bot, l'app, la sorveglianza e `Archivia`
+
+Dopo l'importazione i riferimenti ai sotto-workflow vanno ricollegati ai
+workflow appena creati, perché gli id cambiano.
+
+Poi, nelle impostazioni di **ogni** workflow, imposta `Leroy_Guardiano` come
+*Error Workflow* — tranne che nel guardiano stesso. È il passaggio più noioso e
+il più facile da dimenticare: se ne salti uno, i suoi errori restano invisibili.
 
 ---
 
@@ -233,7 +261,9 @@ Su Gmail crea un filtro che etichetta i mittenti rilevanti — servizi di
 pagamento, banca, utenze — e configura l'ingestore su quell'etichetta.
 
 Su Outlook il filtro è nel codice di normalizzazione: una lista di mittenti
-ammessi.
+ammessi, confrontata con le etichette del **dominio** dell'indirizzo (la voce
+`octopus` vale per `octopusenergy.it`; una voce con il punto, come `tim.it`, vale
+per il dominio intero e i suoi sottodomini).
 
 ---
 
@@ -243,8 +273,9 @@ Crea il bot con BotFather e configura la credenziale. Poi:
 
 - manda `/start` al bot, apri l'esecuzione in n8n e prendi il tuo
   identificativo utente dal campo corrispondente
-- inseriscilo nel nodo di controllo del workflow Telegram: senza, il bot
-  risponderebbe a chiunque lo trovi cercandolo per nome
+- inseriscilo in `Leroy Config`, sia come `chat_id` sia come `utente_id`:
+  senza, il bot risponderebbe a chiunque lo trovi cercandolo per nome, e le
+  notifiche non arriverebbero a te
 - su BotFather, disattiva la possibilità di aggiungerlo ai gruppi
 
 ---
@@ -260,9 +291,10 @@ Crea una macro con trigger sulle notifiche delle app bancarie, vincolata ai
 testi che contengono un importo, e come azione una richiesta HTTP verso il
 webhook, con il token nell'header.
 
-Manda i campi come testo semplice con un separatore improbabile, non come
-JSON: una virgoletta nel testo di una notifica spezzerebbe il corpo della
-richiesta.
+Manda i campi come testo semplice con il separatore `|#|` — titolo, testo,
+pacchetto, timestamp — non come JSON: una virgoletta nel testo di una notifica
+spezzerebbe il corpo della richiesta. Il formato è descritto in
+[`api.md`](api.md).
 
 ---
 
@@ -287,10 +319,12 @@ copiato i file nuovi.
 
 ## 13. Backup
 
-Copia `infra/backup.sh` sul server, rendilo eseguibile e provalo subito.
-Compila in cima le variabili del bot se vuoi essere avvisato quando fallisce:
-un backup che smette di funzionare in silenzio è peggio di non averlo, perché
-dà una sicurezza che non hai.
+Le data table stanno nel database di n8n: salvare quel database (e
+`N8N_ENCRYPTION_KEY`, che sta fuori dal server) salva tutto. Copia
+`infra/backup.sh` sul server, rendilo eseguibile e provalo subito. Compila in
+cima le variabili del bot se vuoi essere avvisato quando fallisce: un backup che
+smette di funzionare in silenzio è peggio di non averlo, perché dà una sicurezza
+che non hai.
 
 ```bash
 crontab -e
@@ -302,6 +336,8 @@ crontab -e
 
 **Porta una copia degli archivi fuori dal server** e prova il ripristino
 almeno una volta. Un backup mai testato è una speranza, non una garanzia.
+Il foglio Google scritto da `Archivia` è un'ulteriore copia, ma non sostituisce
+questo passo.
 
 ---
 
@@ -310,18 +346,20 @@ almeno una volta. Un backup mai testato è una speranza, non una garanzia.
 Nell'ordine, ognuna verifica un pezzo diverso:
 
 1. scrivi una spesa al bot: prova bot, categorizzazione, scrittura
-2. etichetta a mano una vecchia mail di pagamento: prova l'ingestore email e
+2. fai una domanda al bot ("quanto ho speso questo mese?"): prova la traduzione
+   in filtro e la ricerca
+3. etichetta a mano una vecchia mail di pagamento: prova l'ingestore email e
    l'elaborazione condivisa
-3. fai una spesa reale con la carta: prova la catena delle notifiche
-4. apri la PWA e controlla che i tre movimenti ci siano tutti
-5. inserisci una spesa dall'app e verifica che compaia nel foglio con la fonte
-   corretta
-6. fai fallire di proposito un workflow da un trigger vero — non
+4. fai una spesa reale con la carta: prova la catena delle notifiche
+5. apri la PWA e controlla che i movimenti ci siano tutti
+6. inserisci una spesa dall'app e verifica che compaia nella tabella con la
+   fonte corretta
+7. fai fallire di proposito un workflow da un trigger vero — non
    dall'esecuzione manuale, che n8n non considera — e controlla che arrivi
    l'avviso del guardiano
 
-Se il punto 3 e il punto 1 producessero due righe per la stessa spesa, la
-deduplica non sta lavorando: controlla il foglio `Log`, dove sono registrati
+Se il punto 4 e il punto 1 producessero due righe per la stessa spesa, la
+deduplica non sta lavorando: controlla la tabella `log`, dove sono registrati
 gli scarti col relativo motivo.
 
 ---
@@ -333,9 +371,11 @@ tre settimane e confronta i totali: è l'unico modo per scoprire cosa *non* sta
 arrivando. Una banca che manda notifiche prive di contenuto o una mail che
 finisce fuori dal filtro non producono errori — producono silenzio.
 
-**Guarda il foglio `Log`.** Nei primi giorni ti dice se la deduplica sta
-scartando troppo o troppo poco, e le finestre temporali si tarano su quello.
+**Guarda la tabella `log`.** Nei primi giorni ti dice se la deduplica sta
+scartando troppo o troppo poco, e le finestre temporali (in `Leroy Config`) si
+tarano su quello.
 
-**Aspettati molte richieste di conferma.** Il foglio delle regole parte vuoto:
-ogni conferma ne scrive una, e dopo qualche settimana la maggior parte dei
-movimenti verrà categorizzata senza chiamare il modello linguistico.
+**Aspettati molte richieste di conferma.** La tabella `Rules` parte vuota: ogni
+conferma ne scrive una, e dopo qualche settimana la maggior parte dei movimenti
+verrà categorizzata senza chiamare il modello linguistico — sia dal bot sia per
+mail e notifiche.

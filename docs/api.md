@@ -1,6 +1,7 @@
 # API
 
-Endpoint unico che espone il foglio dati alla PWA.
+Endpoint unico che espone le data table di n8n alla PWA. È il workflow
+`Leroy App`.
 
 ```
 POST https://<dominio>/webhook/<percorso>
@@ -14,20 +15,18 @@ Il campo `azione` nel corpo seleziona l'operazione. Ogni risposta è JSON.
 |---|---|
 | `riepilogo` | totali del periodo, categorie, attese, configurazione |
 | `movimenti` | elenco delle transazioni di un periodo |
-| `cerca` | ricerca testuale su tutto lo storico |
-| `andamento` | serie mensile degli ultimi dodici mesi |
-| `inserisci` | registra un movimento |
-| `correggi` | modifica categoria e importo |
+| `cerca` | ricerca su tutto lo storico (delega a `Leroy Search`) |
+| `andamento` | serie mensile degli ultimi dodici mesi più quello in corso |
+| `inserisci` | registra un movimento (tramite `Leroy Scrivi`) |
+| `correggi` | modifica categoria, importo e stato |
 | `elimina` | cancellazione logica |
 | `budget` | aggiorna i budget per categoria |
 
-L'aggregazione avviene lato server: la lettura del foglio è già il costo
-dominante di ogni chiamata, quindi restituire poche decine di numeri anziché
-migliaia di righe non costa nulla in più e alleggerisce molto il client.
-
-Le azioni che guardano indietro nel tempo — `cerca` e `andamento` — leggono
-anche il foglio `Archivio`. Senza, restituirebbero zero sui periodi vecchi
-senza segnalare nulla.
+L'aggregazione avviene lato server: restituire poche decine di numeri anziché
+migliaia di righe alleggerisce molto il client. Le letture sono filtrate sul
+server: `riepilogo` legge il periodo richiesto più le attese, `movimenti` il
+periodo, `andamento` gli ultimi tredici mesi, `cerca` solo ciò che corrisponde
+ai filtri. Nessuna azione scarica più l'intera tabella.
 
 ---
 
@@ -62,7 +61,7 @@ messaggio. Nessuna richiesta resta senza risposta.
 ```
 
 `periodo` è una data ISO troncata, e la sua lunghezza determina la
-granularità:
+granularità. Se manca, è il mese corrente (a Roma).
 
 | Valore | Significato |
 |---|---|
@@ -184,7 +183,9 @@ Note:
 }
 ```
 
-Tutti i campi tranne `azione` sono opzionali.
+Tutti i campi tranne `azione` sono opzionali. `da` e `a` sono date
+`YYYY-MM-DD`, `min` e `max` importi, `limite` il numero massimo di movimenti
+restituiti (predefinito 100, tetto 300).
 
 **Risposta**
 
@@ -206,10 +207,13 @@ Note:
 - con più parole, **tutte** devono comparire: cercando `bar michele` non
   arrivano tutti i bar
 - `totale` e `per_categoria` considerano solo le uscite
+- `conteggio` è il numero di movimenti trovati; `movimenti` può essere più
+  corto, per via di `limite`
 - **la PWA non invia `da` e `a`**: la ricerca guarda deliberatamente tutto lo
   storico, ignorando il periodo selezionato. È il suo scopo, e l'interfaccia lo
   dichiara nella riga di sintesi. I due campi restano disponibili per l'uso dal
   bot Telegram, dove la domanda contiene spesso un riferimento temporale
+- i campi vuoti o `null` sono ignorati
 
 ---
 
@@ -242,6 +246,7 @@ Note:
   corso, che è **parziale**
 - `media_uscite` è calcolata sui soli mesi conclusi: includere quello in corso
   abbasserebbe il riferimento proprio quando serve confrontarcisi
+- le righe `eliminata` e `attesa` non entrano nella serie
 - la serie non dipende dal periodo selezionato
 
 ---
@@ -263,8 +268,9 @@ Note:
 }
 ```
 
-Obbligatori: `importo` (positivo), `tipo`, `categoria`, `conto`.
-Opzionali: `esercente`, `data` (default oggi), `note`.
+Obbligatori: `importo` (positivo) e `categoria`. `tipo` vale `spesa` se manca o
+è diverso da `entrata`, `conto` vale `banca`. Opzionali: `esercente`, `data`
+(default oggi, a Roma), `note`.
 
 **Risposta**
 
@@ -272,11 +278,13 @@ Opzionali: `esercente`, `data` (default oggi), `note`.
 { "ok": true, "hash": "a3f2...", "duplicato_sospetto": false }
 ```
 
-`duplicato_sospetto` a `true` significa che esiste una transazione simile
-registrata di recente da un altro canale. **L'inserimento è comunque
-avvenuto**: qui la decisione è dell'utente, quindi il sistema segnala e non
-scarta. È la differenza rispetto alla raccolta automatica, dove un doppione fra
-due canali viene invece eliminato.
+Se i dati non sono validi: `{ "ok": false, "errore": "importo non valido" }`.
+
+`duplicato_sospetto` a `true` significa che esiste una transazione con lo stesso
+importo e lo stesso conto registrata nelle sei ore precedenti da un altro canale
+(non dall'app). **L'inserimento è comunque avvenuto**: qui la decisione è
+dell'utente, quindi il sistema segnala e non scarta. È la differenza rispetto
+alla raccolta automatica, dove un doppione fra due canali viene invece eliminato.
 
 ---
 
@@ -294,9 +302,9 @@ due canali viene invece eliminato.
 }
 ```
 
-**Tutti i campi sono obbligatori**, importo compreso, anche quando non è
-cambiato: un aggiornamento con un campo vuoto cancellerebbe il valore esistente
-sul foglio.
+Obbligatori: `hash`, `categoria` e `importo` (positivo), anche quando l'importo
+non è cambiato. **Mandare sempre anche `stato`**: se manca, la riga diventa
+`confermata`.
 
 **Attenzione a `stato` quando si corregge un'attesa**: va rimandato `attesa`,
 non `confermata`. Passando `confermata` si dichiarerebbe avvenuto un addebito
@@ -304,7 +312,7 @@ soltanto previsto: la riga entrerebbe nei totali del mese prima che i soldi
 siano usciti, e non verrebbe più riconciliata all'arrivo dell'addebito vero.
 
 Non è possibile modificare data, tipo o conto: per quelli si interviene
-direttamente sul foglio.
+direttamente sulla data table.
 
 **Risposta**
 
@@ -328,14 +336,11 @@ direttamente sul foglio.
 { "ok": true }
 ```
 
-È una **cancellazione logica**: la riga resta nel foglio con stato
+È una **cancellazione logica**: la riga resta in `Transactions` con stato
 `eliminata` e viene esclusa da riepiloghi, elenchi, ricerche, andamento e
 controllo duplicati. Dal punto di vista dell'app il movimento è sparito, ma
-resta recuperabile intervenendo sul foglio.
-
-La scelta evita di lavorare sugli indici di riga, che cambiano a ogni
-ordinamento, ed è coerente col principio per cui nulla viene distrutto in
-silenzio.
+resta recuperabile intervenendo sulla tabella. Coerente col principio per cui
+nulla viene distrutto in silenzio.
 
 ---
 
@@ -347,14 +352,31 @@ silenzio.
 { "azione": "budget", "valori": { "Supermercato": 161, "Ristorante": 134 } }
 ```
 
-Invia solo le categorie effettivamente modificate. I nomi che non esistono nel
-foglio `Categorie` vengono ignorati.
+Invia solo le categorie effettivamente modificate. I nomi che non esistono nella
+data table `Category` vengono ignorati.
 
 **Risposta**
 
 ```json
 { "ok": true, "aggiornate": 2 }
 ```
+
+---
+
+## L'ingresso delle notifiche
+
+È un webhook diverso (`Leroy android`), con un proprio token. Accetta un
+corpo di testo con i campi separati da `|#|`, nell'ordine
+
+```
+titolo|#|testo|#|pacchetto|#|timestamp
+```
+
+oppure un oggetto JSON con le stesse quattro chiavi (`titolo`, `testo`,
+`pacchetto`, `ts`). `ts` è il momento della notifica, in secondi o millisecondi:
+fa parte dell'identità della riga, quindi due acquisti identici nello stesso
+giorno restano distinti, mentre un reinvio della stessa notifica viene scartato.
+Una notifica senza un importo viene ignorata; il webhook risponde sempre subito.
 
 ---
 
