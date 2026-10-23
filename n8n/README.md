@@ -1,6 +1,6 @@
 # Leroy — workflow n8n
 
-Quattordici workflow, in sei gruppi. La fonte di verità è
+Quindici workflow, in sei gruppi. La fonte di verità è
 l'istanza n8n: in questa cartella non ci sono più gli export JSON (vanno
 riesportati dall'istanza quando servono). Il punto di ripristino delle
 versioni sta in [`backup/`](backup/BACKUP_2026-10-22.md).
@@ -12,9 +12,9 @@ versioni sta in [`backup/`](backup/BACKUP_2026-10-22.md).
 | Interazione | `Telegram_leroy`, `Leroy App`, `Leroy Search`, `Leroy Chiedi` |
 | Sorveglianza | `Leroy_Guardiano`, `Attese non avverate`, `Report periodico` |
 | Manutenzione | `Archivia` |
-| Servizio | `Leroy Scrivi`, `Leroy Config` |
+| Servizio | `Leroy Scrivi`, `Leroy Config`, `Leroy LLM` |
 
-`Leroy Search`, `Leroy Chiedi`, `Leroy Scrivi`, `Leroy Config` e
+`Leroy Search`, `Leroy Chiedi`, `Leroy Scrivi`, `Leroy Config`, `Leroy LLM` e
 `Leroy Processa Dati` non hanno un trigger proprio: li chiamano gli altri.
 
 ---
@@ -85,6 +85,7 @@ Leroy App ───────────────────────�
 Guardiano · Attese non avverate · Report periodico  ──→  Telegram
 Archivia  ──→  Google Sheet (backup)
 Leroy Config  ← chat id, utente, conti, finestre (letto da quasi tutti)
+Leroy LLM     ← unica uscita verso il modello (Processa Dati, Telegram_leroy, Leroy Chiedi)
 ```
 
 Gli ingestori sono sottili e specializzati; l'elaborazione è unica e condivisa.
@@ -110,6 +111,22 @@ chiamano `Telegram_leroy` (subito dopo il trigger), `Leroy Processa Dati`,
 
 Una conseguenza da ricordare: `Leroy_Guardiano` per avvisarti di un guasto
 chiama `Leroy Config`. Se fosse proprio quello a rompersi, l'allerta non parte.
+
+### Leroy LLM
+
+L'**unica uscita verso il modello linguistico**. Riceve `body_json` — il corpo di
+una richiesta `generateContent` già costruito dal chiamante — e restituisce la
+risposta del modello nella stessa forma (`candidates[0].content.parts[0].text`).
+Modello, credenziale, tentativi (tre, a cinque secondi l'uno dall'altro) e
+gestione dell'errore stanno solo qui: se la chiamata fallisce restituisce
+l'oggetto d'errore invece di una risposta, e il chiamante decide che fare.
+
+Lo chiamano `Leroy Processa Dati`, `Telegram_leroy` e `Leroy Chiedi`, ciascuno
+nel nodo che si chiama ancora `Gemini` o `Gemini domanda`: il nome è rimasto
+perché il codice a valle legge `$('Gemini')`. Costruiscono il prompt e leggono
+la risposta da sé; il contratto è volutamente quello di Gemini, così cambiare
+fornitore significa tradurre richiesta e risposta dentro questo workflow, senza
+toccare i tre chiamanti.
 
 ---
 

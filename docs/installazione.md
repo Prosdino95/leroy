@@ -239,7 +239,7 @@ identificativi Telegram. L'elenco completo è in
 **Importa e attiva prima i sotto-workflow, poi tutto il resto**: un richiamo
 verso un workflow inattivo fallisce. L'ordine:
 
-1. `Leroy Config`, `Leroy Scrivi`, `Leroy Search`, `Leroy Chiedi`
+1. `Leroy Config`, `Leroy LLM`, `Leroy Scrivi`, `Leroy Search`, `Leroy Chiedi`
 2. `Leroy Processa Dati`
 3. gli ingestori, il bot, l'app, la sorveglianza e `Archivia`
 
