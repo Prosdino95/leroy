@@ -86,37 +86,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.body_json }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        608,
-        224
-      ],
-      "id": "5fa8c36b-3648-4dee-965f-dafd411852f5",
-      "name": "Gemini",
-      "alwaysOutputData": true,
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 5000,
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "CRED_HTTPQUERYAUTH",
-          "name": "Gemini - leroy"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
         "jsCode": "function normalizza(s) {\n  if (!s) return '';\n  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '')\n    .toLowerCase().replace(/\\s+/g, ' ').trim();\n}\n\nfunction hash64(str) {\n  let h = 0xcbf29ce484222325n;\n  const p = 0x100000001b3n;\n  for (let i = 0; i < str.length; i++) {\n    h ^= BigInt(str.charCodeAt(i));\n    h = (h * p) & 0xffffffffffffffffn;\n  }\n  return h.toString(16).padStart(16, '0');\n}\n\nfunction uuid() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = Math.random() * 16 | 0;\n    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n  });\n}\n\nfunction dataISO(s) {\n  if (!s) return null;\n  s = String(s).trim();\n  let x = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (x) return `${x[1]}-${x[2]}-${x[3]}`;\n  x = s.match(/(\\d{1,2})[\\/\\-.](\\d{1,2})[\\/\\-.](\\d{2,4})/);\n  if (!x) return null;\n  let [, g, me, a] = x;\n  if (a.length === 2) a = '20' + a;\n  return `${a}-${me.padStart(2, '0')}-${g.padStart(2, '0')}`;\n}\n\n// Giorno di calendario a Roma: una mail delle 00:30 non deve finire sul\n// giorno prima solo perche' il timestamp e' in UTC.\nfunction giornoRoma(s) {\n  const t = String(s || '').trim();\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(t)) return t;\n  const d = new Date(t);\n  if (isNaN(d.getTime())) return t.slice(0, 10);\n  return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });\n}\n\n// Un messaggio che non e' una transazione NON deve far restituire una lista\n// vuota: il chiamante non vedrebbe nessun output e non marcherebbe la mail\n// come lavorata (etichetta Gmail / cartella Outlook).\nconst ignora = (motivo) => [{ json: { esito: 'ignora', motivo } }];\n\nconst m = $('Estrattori').first().json;\nlet dati = { ...m };\n\nif (!m.importo) {\n  const risposta = $('Gemini').first().json;\n  const parts = risposta?.candidates?.[0]?.content?.parts || [];\n  const testo = parts.map(p => p.text).filter(Boolean).join('')\n    .replace(/```json|```/g, '').trim();\n\n  if (!testo) {\n    throw new Error('Gemini non ha restituito testo: ' + JSON.stringify(risposta).slice(0, 300));\n  }\n\n  let p;\n  try {\n    p = JSON.parse(testo);\n  } catch (e) {\n    throw new Error('JSON non parsabile da Gemini: ' + testo.slice(0, 300));\n  }\n\n  if (!p.e_transazione) return ignora('non e una transazione');   // corretto uscire\n\n  dati = { ...m, ...p, confidenza: Number(p.confidenza) || 0.5 };\n}\n\nif (!dati.importo || dati.importo <= 0) return ignora('importo mancante o non valido');\n\nlet confidenza = Number(dati.confidenza || 0.5);\nlet avviso = '';\n\nconst nota = (t) => { avviso = avviso ? avviso + ' — ' + t : t; };\n\n// --- Plausibilita' dell'importo ---\n// Se nel testo c'erano piu' cifre e quella scelta non coincide col totale\n// ancorato a parola chiave, la fiducia scende e la riga nasce da verificare.\nconst alternativi = (m.importi_trovati || []).filter(v => v !== Number(dati.importo));\n\nif (m.totale_ancorato && Number(dati.importo) !== m.totale_ancorato) {\n  confidenza = Math.min(confidenza, 0.5);\n  nota('il testo indicava come totale ' + m.totale_ancorato);\n} else if (alternativi.length > 0 && !m.totale_ancorato) {\n  confidenza = Math.min(confidenza, 0.6);\n  nota('altri importi nel testo: ' + alternativi.slice(0, 5).join(', '));\n}\n\n// --- Regole apprese ---\n// Quelle create dal bot Telegram quando confermi una categoria: gratis e\n// istantanee, valgono anche per mail e push. Una regola vince su Gemini solo\n// se la sua categoria esiste ancora fra quelle ammesse.\nconst ammesse = $('Prepara').first().json.categorie || [];\nconst regole = $('Leggi Regole').all().map(i => i.json)\n  .filter(r => r && r.pattern && normalizza(r.pattern).length >= 2);\nconst testoRegole = normalizza((dati.esercente || '') + ' ' + (dati.oggetto || ''));\nconst regola = regole.find(r => testoRegole.includes(normalizza(r.pattern)));\nconst catRegola = regola\n  ? ammesse.find(c => normalizza(c) === normalizza(regola.categoria))\n  : null;\n\n// --- Validita' della categoria ---\n// Le categorie sono fisse: quelle della tabella, nessuna in piu'. Gemini\n// propone, qui si verifica. Il confronto normalizzato perdona maiuscole e\n// accenti e riconduce al nome esatto della tabella.\nconst trovata = catRegola || ammesse.find(c => normalizza(c) === normalizza(dati.categoria));\nconst categoria = trovata || '';\n\nif (!trovata) {\n  confidenza = Math.min(confidenza, 0.3);\n  nota('categoria non valida: \"' + (dati.categoria || 'vuota') + '\"');\n} else if (catRegola && !avviso) {\n  // La categoria e' certa; resta incerto soltanto cio' che ha segnalato un avviso.\n  confidenza = Math.max(confidenza, 0.9);\n}\n\nconst daVerificare = confidenza < 0.75;\n\n// --- Momento: addebito avvenuto o soltanto annunciato? ---\n// Il modello propone, il codice verifica: un annuncio senza una data futura\n// non è un annuncio. È la stessa logica applicata alla categoria, dove la\n// proposta viene confrontata con l'elenco reale.\nconst dataMsg = giornoRoma(dati.data);\nconst prev = dataISO(dati.data_prevista) || m.scadenza_ancorata || null;\nconst annuncio = dati.momento === 'annuncio' && !!prev && prev > dataMsg;\n\nif (dati.momento === 'annuncio' && !annuncio) {\n  nota('dichiarato annuncio ma senza data futura: registrato come addebito');\n}\n\n// Un'attesa vale alla data prevista, un addebito a quella del messaggio.\nconst data = annuncio ? prev : dataMsg;\n\nconst esercente = normalizza(dati.esercente);\n\nconst conto = /paypal/.test(m.mittente) ? 'paypal'\n            : /satispay/.test(m.mittente) ? 'satispay'\n            : /revolut/.test(m.mittente) ? 'revolut'\n            : 'banca';\n\n// Calcolato dopo che la data è definitiva, altrimenti per le attese l'hash\n// descriverebbe un giorno diverso da quello scritto nella riga.\nconst hash = hash64([data, Number(dati.importo).toFixed(2), esercente,\n                     conto, m.id_esterno].join('|'));\n\nconst statoRiga = annuncio ? 'attesa'\n                : daVerificare ? 'da_verificare'\n                : 'confermata';\n\nreturn [{ json: {\n  riga: {\n    id: uuid(),\n    data_evento: data,\n    data_inserimento: new Date().toISOString(),\n    fonte: m.fonte,\n    tipo: dati.tipo || 'spesa',\n    importo: Number(dati.importo).toFixed(2),\n    valuta: 'EUR',\n    conto,\n    esercente,\n    categoria,\n    sottocategoria: '',\n    note: dati.oggetto || '',\n    testo_grezzo: (m.mittente + ' | ' + m.oggetto).slice(0, 500),\n    hash_dedup: hash,\n    confidenza: confidenza.toFixed(2),\n    stato: statoRiga,\n  },\n  avviso,\n  regola: catRegola\n    ? { pattern: String(regola.pattern), utilizzi: Number(regola.utilizzi) || 0 }\n    : null,\n}}];"
       },
       "type": "n8n-nodes-base.code",
@@ -421,6 +390,28 @@
         1728,
         560
       ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "2M5mGE6hUdCz3v0c",
+          "cachedResultName": "Leroy LLM"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "3e1a75bc-d23a-484b-aa19-5c20a6fa6385",
+      "name": "Gemini",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        608,
+        224
+      ]
     }
   ],
   "connections": {
@@ -455,17 +446,6 @@
             "index": 0
           }
         ],
-        [
-          {
-            "node": "Componi riga",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gemini": {
-      "main": [
         [
           {
             "node": "Componi riga",
@@ -592,6 +572,17 @@
           }
         ]
       ]
+    },
+    "Gemini": {
+      "main": [
+        [
+          {
+            "node": "Componi riga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -604,7 +595,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "saveManualExecutions": true
   },
-  "versionId": "458141a5-acd1-4e75-8fda-eb7d429b51f2",
+  "versionId": "bbc6a263-a5b6-45be-a25c-884937c30356",
   "meta": {
     "templateCredsSetupCompleted": true,
     "aiBuilderAssisted": true,

@@ -51,34 +51,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.body_json }}",
-        "options": {}
-      },
-      "id": "2c21aa95-8ecb-4b4d-be82-db869c89940f",
-      "name": "Gemini domanda",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        672,
-        304
-      ],
-      "alwaysOutputData": true,
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "CRED_HTTPQUERYAUTH",
-          "name": "Gemini - leroy"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
         "jsCode": "const prep = $('Prepara domanda').first().json;\nconst risposta = $('Gemini domanda').first().json;\n\nconst parts = risposta?.candidates?.[0]?.content?.parts || [];\nconst grezzo = parts.map(p => p.text).filter(Boolean).join('')\n  .replace(/\\x60\\x60\\x60json|\\x60\\x60\\x60/g, '').trim();\n\nlet f = null;\ntry { f = JSON.parse(grezzo); } catch { f = null; }\n\nconst fallito = (msg) => [{ json: { errore: msg } }];\n\nif (!f) return fallito('Non sono riuscito a interpretare la domanda. Riprova.');\nif (f.capita === false) {\n  return fallito('Rispondo solo a domande su spese e movimenti. Prova con ' +\n                 '\"quanto ho speso in ristoranti a luglio\".');\n}\n\n// --- validazione di ogni campo ---\nconst ISO = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;\nconst numOrNull = (v) =>\n  (v === null || v === undefined || v === '') ? null\n  : (Number.isFinite(Number(v)) ? Number(v) : null);\n\n// La categoria deve esistere davvero: il confronto e' insensibile alle\n// maiuscole e riconduce al nome esatto della tabella.\nconst cat = prep.categorie.find(c =>\n  c.toLowerCase() === String(f.categoria || '').toLowerCase()) || null;\n\nlet da = ISO.test(String(f.da)) ? String(f.da) : null;\nlet a  = ISO.test(String(f.a))  ? String(f.a)  : null;\nif (da && a && da > a) { const t = da; da = a; a = t; }   // intervallo invertito\n\nconst filtro = {\n  azione: 'cerca',\n  q: f.q ? String(f.q).slice(0, 60) : null,\n  da, a,\n  categoria: cat,\n  tipo: ['spesa', 'entrata'].includes(f.tipo) ? f.tipo : null,\n  min: numOrNull(f.min),\n  max: numOrNull(f.max),\n  limite: 200,\n};\n\n// Un filtro completamente vuoto restituirebbe tutto lo storico: quasi sempre\n// significa che la domanda non e' stata capita.\nconst vuoto = !filtro.q && !filtro.da && !filtro.a && !filtro.categoria &&\n              !filtro.tipo && filtro.min === null && filtro.max === null;\nif (vuoto) return fallito('Non ho capito su cosa cercare. Prova a indicare un ' +\n                          'periodo, una categoria o un nome.');\n\nconst agg = ['totale', 'elenco', 'per_categoria'].includes(f.aggregazione)\n  ? f.aggregazione : 'totale';\n\nreturn [{ json: {\n  aggregazione: agg,\n  filtro,\n  filtro_json: JSON.stringify(filtro),\n}}];"
       },
       "id": "c573bc9b-3a07-4731-889d-3bf867528d8b",
@@ -258,6 +230,28 @@
         1328,
         432
       ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "2M5mGE6hUdCz3v0c",
+          "cachedResultName": "Leroy LLM"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "df9b1510-94c1-43d0-931a-96aefc6b7d04",
+      "name": "Gemini domanda",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        304
+      ]
     }
   ],
   "connections": {
@@ -277,28 +271,6 @@
         [
           {
             "node": "Prepara domanda",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepara domanda": {
-      "main": [
-        [
-          {
-            "node": "Gemini domanda",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gemini domanda": {
-      "main": [
-        [
-          {
-            "node": "Leggi filtro",
             "type": "main",
             "index": 0
           }
@@ -344,6 +316,28 @@
           }
         ]
       ]
+    },
+    "Prepara domanda": {
+      "main": [
+        [
+          {
+            "node": "Gemini domanda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini domanda": {
+      "main": [
+        [
+          {
+            "node": "Leggi filtro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -355,24 +349,12 @@
     "saveManualExecutions": true,
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "0893435f-a13b-4552-8671-fdf3979a6647",
+  "versionId": "a56e28b7-fbe8-456c-88a6-261da633d948",
   "meta": {
     "aiBuilderAssisted": true,
     "builderVariant": "mcp"
   },
-  "nodeGroups": [
-    {
-      "id": "ffa5c08f-539e-4fea-a117-9eb84e3f91b2",
-      "name": "Interpreta la domanda",
-      "nodeIds": [
-        "43b2584a-5e27-4847-9584-219294ad274e",
-        "6064dbda-e86d-4294-b667-c624e9fae8de",
-        "2c21aa95-8ecb-4b4d-be82-db869c89940f",
-        "c573bc9b-3a07-4731-889d-3bf867528d8b"
-      ],
-      "description": "Traduce la domanda in un filtro strutturato con Gemini e lo valida campo per campo"
-    }
-  ],
+  "nodeGroups": [],
   "id": "ld4zKayHMlUoTu3X",
   "tags": []
 }
